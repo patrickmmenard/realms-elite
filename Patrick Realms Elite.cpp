@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+
 #include <map>
 #include <random>
 #include <utility>
@@ -15,6 +16,8 @@
 
 #include "Enemy.h"
 #include "random_utils.h"
+#include <windows.h>
+#include <cmath>
 //#include <function>
 using namespace std;
 using namespace std::chrono;
@@ -22,9 +25,22 @@ using namespace std::chrono;
 namespace colors {
 	const string green =	"\033[32m";
 	const string red =		"\033[31m";
+	const string red_bg =	"\033[41m";
+
 	const string blue =		"\033[34m";
-	const string blue_bg = "\033[44m";
-	const string grey =		"\033[90m";
+	const string light_blue = "\033[94m";
+	const string blue_bg =		"\033[44m";
+
+	const string grey =			"\033[90m";
+	const string none =			"";
+	const string white_bg =		"\033[47m";
+
+	const string purple_bg =	"\033[45m";
+	const string bright_purple_bg = "\033[105m";
+	const string violet_bg = "\033[48;5;54m";
+
+	const string green_bg = "\033[48;5;58m";
+
 	const string color_reset = "\033[0m";
 }
 
@@ -42,38 +58,98 @@ namespace terminal {
 //}
 
 struct Glyph {
-	char symbol;
-	const string& color;
+	string symbol;
+	string color;
+	string background = "";
 	bool use_color = true;
 };
 
-const Glyph cap_player{ 'X', colors::color_reset };
-const Glyph cap_dict{'D', colors::color_reset};
-const Glyph cap_negan{'N', colors::color_reset};
-const Glyph cap_repub{'R', colors::color_reset};
-const Glyph occ_player{'C', colors::blue};
-const Glyph empty_tile{'.', colors::green};
+const Glyph cap_player{ "X", colors::color_reset, colors::none };
+const Glyph cap_dict{ "D", colors::color_reset, colors::none };
+const Glyph cap_negan{ "N", colors::color_reset, colors::none };
+const Glyph cap_repub{ "R", colors::color_reset, colors::none };
+const Glyph occ_player{ "C", colors::blue, colors::none };
+
+const Glyph empty_tile{ ".", colors::green, colors::none };
 //const Glyph cap_enemy_1{ 'R' || 'N' || 'D', colors::red };
-const Glyph occ_enemy_1{'1', colors::red};
-const Glyph occ_enemy_2{'2', colors::red};
-const Glyph road{'-', colors::grey};
-const Glyph spacer{ ' ',"", false };
-const Glyph water_tile{' ', colors::blue_bg};
+const Glyph occ_enemy_1{ " ", colors::none, colors::red_bg };
+const Glyph occ_enemy_texture{ "3", colors::grey, colors::red_bg};
+const Glyph occ_enemy_2{ "#", colors::grey, colors::green_bg };
+const Glyph occ_enemy_texture2{ "3", colors::none, colors::green_bg };
+
+const Glyph road{"-", colors::grey, colors::none };
+const Glyph spacer{ " ",colors::none, colors::none, false };
+const Glyph water_tile{ " ","", colors::blue_bg };
+const Glyph water_wave{ "~", colors::light_blue, colors::blue_bg};
+
+const Glyph player_tile{" ", colors::none, colors::violet_bg};
+const Glyph player_texture{".", colors::grey, colors::violet_bg};
+const Glyph explosion_tile{" ", colors::none, colors::white_bg};
+
+vector<string> tank_art = {
+	".||= ",
+	"OOOO"
+};
+
+string frame;
 
 bool flashing = false;
 
 void draw(const Glyph& g) {
 	if (flashing) {
-		cout << colors::red << g.symbol << colors::color_reset; 
+		cout << g.background
+			 << colors::red 
+			 << g.symbol 
+			 << colors::color_reset; 
 	}
-
-	else if (g.use_color && !g.color.empty()){
-		cout << g.color
-		<< g.symbol
-		<< colors::color_reset;
+	else if (g.use_color){
+		cout << g.background
+		     << g.color
+			 << g.symbol
+			 << colors::color_reset;
 	}
 	else { cout << g.symbol; }
-	//return true;
+}
+
+void append_draw(string& frame, const Glyph& g) {
+	if (flashing) {
+		frame += g.background;
+		frame += colors::red;
+		frame += g.symbol;
+		frame += colors::color_reset;
+	}
+	else if (g.use_color) {
+		frame += g.background;
+		frame += g.color;
+		frame += g.symbol;
+		frame += colors::color_reset;
+	}
+	else { frame += g.symbol; }
+}
+
+void draw_tank(int cx, int cy) {
+	for (int row = 0; row < tank_art.size(); ++row) {
+		for (int col = 0; col < tank_art[row].size(); ++col) {
+
+			char c = tank_art[row][col];
+			if (c == ' ') continue;
+
+			int x = cx + col;
+			int y = cy - row;
+		
+		}
+	}
+}
+
+char tank_char_at(int x, int y, int cx, int cy) {
+	int local_col = x - cx;
+	int local_row = cy - y;
+
+	if (local_row < 0 || local_row >= tank_art.size()) return ' ';
+	if (local_col < 0 || local_col >= tank_art[local_row].size()) return ' ';
+
+	return tank_art[local_row][local_col];
+
 }
 
 //Patrick's little helpers!
@@ -109,15 +185,36 @@ struct GovtInfo {
 
 map<string, GovtInfo> info =  //more to come...
 {
-		{"Republic",	{'R', 1, 0}},
+		{"Republic",	{'R', 1, 0}},			//attack,defense bonuses...
 		{"Dictatorship",{'D', 3, 0}},
 		{"Negan",		{'N', 2, 1}},
 };
 
-string random_dir() {// WORKING HERE
+string random_dir() {
 	int randomDir = rand() % 4;
 	return attack_direction[randomDir];
-}
+};
+
+vector<string> messages = {
+	"Victory!",
+	"Game Over!",
+	"We are under attack!",
+	"Crush'em!",
+	"Easy peasy, lemon squeezy!",
+	"Year 3"
+};
+
+vector <string> box_lines = {
+	"===============",
+	"=             =",
+	"=             =",
+	"=             =",
+	"=             =",
+	"=             =",
+	"==============="
+};
+
+
 
 //bool e1_attack_neighbour(GameState_enemy& state, map<pair<int, int>, char>& tiles);
 
@@ -154,6 +251,8 @@ struct GameState_enemy {
 	};
 };
 
+
+
 struct PairHash{
 	size_t operator()(const pair<int,int>& p) const {
 		return hash<int>{}(p.first) ^ (hash<int>{}(p.second) << 1);
@@ -161,7 +260,7 @@ struct PairHash{
 };
 
 struct GameState {
-	int year = 0;
+	
 	long long population = 10000000;
 	long long money = 1000000;
 	long long food = 10000000;
@@ -179,7 +278,9 @@ struct GameState {
 	map<pair<int, int>, char> tiles;
 	unordered_set <pair<int, int>, PairHash> occupied;
 	vector<pair<int, int>> frontier;
-
+	vector<pair<int, int>> frontier_e1;
+	vector<pair<int, int>> frontier_e2;
+	
 	map<string, double> inventory = { //rounding rules later...
 		{"Jets", 0.0},
 		{"Tanks", 0.0},
@@ -188,7 +289,52 @@ struct GameState {
 		{"Industrial Robots", 0.0},
 		{"Cars", 0.0}
 	};
+
+	bool gameover = 0;
+	bool victory = 0;
+	int year = 0;
+	int day = 0;
+
+	bool tank_active = 0;
+	int tank_x = 1;
+	int tank_y = 0;
+	string tank_dir;
 };
+
+void update_msg_box(const GameState& state){
+	box_lines[0] = "===============";
+
+	string state_year = to_string(state.year);
+	string show_year = "= Year:" + state_year + "  =";
+	box_lines[4] = show_year;
+
+	string state_day = to_string(state.day);
+	string show_day = "= Day:" + state_day + "  =";
+	box_lines[5] = show_day;
+
+	if (state.victory == 1) {
+		box_lines[1] =	"= Victory!    =";
+		box_lines[2] =	"=             ="; 
+	}
+	else if (state.gameover == 1) {
+		box_lines[1] = "= Game Over!  =";
+		box_lines[2] = "=             =";
+	}
+	else {
+		box_lines[1] = "=             =";
+		box_lines[2] = "=             =";
+	}
+}
+
+string msg_box_row(int row) {
+	if (int i = row - 10; i >= 0 && i < box_lines.size()) {
+		return box_lines[i];
+	}
+	return string(15, ' ');
+};
+
+const vector < pair<int, int>> dirs = { {1,0}, {-1,0}, {0,1}, {0,-1} };
+void make_explosions(GameState& state, string frame, int number);
 
 inline void set_tile(GameState& s, pair<int,int> pos, char c) {
 	s.tiles[pos] = c;
@@ -261,14 +407,245 @@ bool enemy_attack_once(GameState& state, Enemy* enemy, char sym) {
 	return false;
 };
 
-
-
-struct Bounds{
+struct Bounds {
 	int max_x;
 	int max_y;
 	int min_x;
 	int min_y;
 };
+
+Bounds find_bounds_player(const GameState& state);
+
+bool enemy_single_attack(GameState& state, string dir, Enemy* e1, int e1x, int e1y) {  //new version of enemy_attack_once(); based on functional (92% acquisition) attack_neighbour_dir
+
+	bool success = false;
+	auto b_before = find_bounds_player(state);
+	char old_tile = 'w';
+	int sx, sy;
+	
+	if (state.frontier_e1.empty()) {
+		sx = e1->get_coord().first;
+		sy = e1->get_coord().second;
+	}
+	else {
+		int i = rand() % state.frontier_e1.size();
+		sx = state.frontier_e1[i].first;
+		sy = state.frontier_e1[i].second;
+	}
+
+	int nx = sx;
+	int ny = sy;
+
+	int attempts = 0;
+
+	while (!success && attempts < 50) {
+
+		attempts++;
+		old_tile = 'w';			// old_tile reset to avoid that a value stays stale across iterations. 
+		nx = sx;				//same thinking.
+		ny = sy;
+
+		if (dir == "east")			nx = sx + 1;
+		else if (dir == "west")		nx = sx - 1;
+		else if (dir == "north")	ny = sy + 1;
+		else if (dir == "south")	ny = sy - 1;
+
+		if (state.tiles.contains({ nx,ny })) {
+			old_tile = state.tiles.at({ nx,ny });
+		}
+
+		if (nx == 0 && ny == 0) {				//if Enemy1 takes Player.
+			set_tile(state, { nx, ny }, '1');
+			state.gameover = 1;
+				for (auto& [pos, tile] : state.tiles) {
+					if (tile == 'C') {
+						tile = '1';
+					}
+				}
+			success = true;
+			return true;
+		}
+		else if ((old_tile == 'C' || old_tile == '2') && !(nx == state.tank_x && ny == state.tank_y)) {
+			//make_explosions(state, 5);
+			//flash_screen(state, b_before);
+			
+			set_tile(state, { nx,ny }, '1');
+			success = true;
+		}
+
+		else if (state.occupied.contains({ nx,ny }) &&  // if already occupied
+			!(old_tile == 'C' || old_tile == '2') ||	// and not an enemy tile
+			(nx == state.tank_x && ny == state.tank_y)) // and not Tank.
+			{
+			//dir = random_dir();	
+			if (state.frontier_e1.empty()) {
+				sx = e1->get_coord().first;
+				sy = e1->get_coord().second;
+			}
+			else {
+				int i = rand() % state.frontier_e1.size();
+				sx = state.frontier_e1[i].first;
+				sy = state.frontier_e1[i].second;
+			}
+			continue;							//restart loop.
+			}
+
+	}
+
+	if (!(old_tile == 'C' || old_tile == '2') && !(old_tile == '1') && !(old_tile == info[e1->get_type()].symbol) &&
+		!(nx == state.tank_x && ny == state.tank_y)
+		) {
+		set_tile(state, { nx,ny }, '1');
+	}
+
+	state.frontier_e1.clear();
+
+	//char t = info[e1->get_type()].symbol;
+	for (auto& [pos, tile] : state.tiles) {  //in all tiles
+		bool is_capital = (pos.first == e1x && pos.second == e1y);
+		
+		if (tile != '1' && !is_capital) continue; // if not this enemy's tile
+
+		int x = pos.first;
+		int y = pos.second;
+
+		for (const auto&[dx, dy]: dirs) {
+			int nx = x + dx;
+			int ny = y + dy;
+
+			if (!state.occupied.contains({nx, ny})) {
+				state.frontier_e1.push_back(pos);
+				break;
+			}
+
+			char neighbour_tile = state.tiles.at({nx, ny});
+
+			{
+				if (neighbour_tile != '1' && neighbour_tile != is_capital) {
+				}
+				state.frontier_e1.push_back(pos);
+				break;
+			}
+		}
+	}
+	return success;
+}
+
+bool enemy2_single_attack(GameState& state, string dir, Enemy* e2, int e2x, int e2y) {  //new version of enemy_attack_once(); based on functional (92% acquisition) attack_neighbour_dir
+
+	bool success = false;
+	auto b_before = find_bounds_player(state);
+	char old_tile = 'w';
+	int sx, sy;
+
+	if (state.frontier_e2.empty()) {
+		sx = e2->get_coord().first;
+		sy = e2->get_coord().second;
+	}
+	else {
+		int i = rand() % state.frontier_e2.size();
+		sx = state.frontier_e2[i].first;
+		sy = state.frontier_e2[i].second;
+	}
+
+	int nx = sx;
+	int ny = sy;
+
+	int attempts = 0;
+
+	while (!success && attempts < 50) {
+
+		attempts++;
+		old_tile = 'w';			// old_tile reset to avoid that a value stays stale across iterations. 
+		nx = sx;				//same thinking.
+		ny = sy;
+
+		if (dir == "east")			nx = sx + 1;
+		else if (dir == "west")		nx = sx - 1;
+		else if (dir == "north")	ny = sy + 1;
+		else if (dir == "south")	ny = sy - 1;
+
+		if (state.tiles.contains({ nx,ny })) {
+			old_tile = state.tiles.at({ nx,ny });
+		}
+
+		if (nx == 0 && ny == 0) {				//if Enemy1 takes Player.
+			set_tile(state, { nx, ny }, '2');
+			state.gameover = 1;
+			for (auto& [pos, tile] : state.tiles) {
+				if (tile == 'C') {
+					tile = '2';
+				}
+			}
+			success = true;
+			return true;
+		}
+		else if ((old_tile == 'C' || old_tile == '1') && !(nx == state.tank_x && ny == state.tank_y)) {
+			//make_explosions(state, 5);
+			//flash_screen(state, b_before);
+
+			set_tile(state, { nx,ny }, '2');
+			success = true;
+		}
+
+		else if (state.occupied.contains({ nx,ny }) &&  // if already occupied
+			!(old_tile == 'C' || old_tile == '1') ||	// and not an enemy tile
+			(nx == state.tank_x && ny == state.tank_y)) // and not Tank.
+		{
+			//dir = random_dir();	
+			if (state.frontier_e2.empty()) {
+				sx = e2->get_coord().first;
+				sy = e2->get_coord().second;
+			}
+			else {
+				int i = rand() % state.frontier_e2.size();
+				sx = state.frontier_e2[i].first;
+				sy = state.frontier_e2[i].second;
+			}
+			continue;							//restart loop.
+		}
+
+	}
+
+	if (!(old_tile == 'C' || old_tile == '1') && !(old_tile == '2') && !(old_tile == info[e2->get_type()].symbol) &&
+		!(nx == state.tank_x && ny == state.tank_y)
+		) {
+		set_tile(state, { nx,ny }, '2');
+	}
+
+	state.frontier_e2.clear();
+
+	//char t = info[e1->get_type()].symbol;
+	for (auto& [pos, tile] : state.tiles) {  //in all tiles
+		bool is_capital = (pos.first == e2x && pos.second == e2y);
+
+		if (tile != '2' && !is_capital) continue; // if not this enemy's tile
+
+		int x = pos.first;
+		int y = pos.second;
+
+		for (const auto& [dx, dy] : dirs) {
+			int nx = x + dx;
+			int ny = y + dy;
+
+			if (!state.occupied.contains({ nx, ny })) {
+				state.frontier_e2.push_back(pos);
+				break;
+			}
+
+			char neighbour_tile = state.tiles.at({ nx, ny });
+
+			{
+				if (neighbour_tile != '2' && neighbour_tile != is_capital) {
+				}
+				state.frontier_e2.push_back(pos);
+				break;
+			}
+		}
+	}
+	return success;
+}
+
 
 int count_controlled_tiles(const GameState& state);
 
@@ -316,7 +693,7 @@ map<int, string> bank_menu = {
 
 map<int, string> war_menu = {
 		{1, "Attack"},
-		{2, "Buy Tanks"},
+		{2, "Move Tanks"},
 		{3, "Buy Turrets"}, 
 		{4, "Show current map"},
 		{9, "Return to System Menu"}
@@ -329,6 +706,7 @@ map<int, string> test_menu = {
 		{3, "Missile"},
 		{4, "Gain Access to Water"},
 		{5, "Flash Screen aka BOOM"},
+		{6, "Explosions"},
 		{9, "Quit"}
 };
 
@@ -346,7 +724,7 @@ void show_beta_banner() {
 #                                  #
 #              BETA                #
 ####################################
-   
+  
 )";
 }
 
@@ -558,67 +936,156 @@ Bounds find_bounds_player(const GameState& state);
 void show_minimap(const GameState& state, const Bounds& b) {
 	blank_lines(2);
 
-	Bounds world = find_bounds(state);
-	
+	//Bounds world = find_bounds(state); //Goal: making the rendered screen a stable rectangle with a fixed box instead. 
+	Bounds world;
+	world.min_x = -40;
+	world.max_x = 40;
+	world.min_y = -20;
+	world.max_y = 20;
+
 	for (int y = world.max_y; y >= world.min_y; --y) {
 		for (int x = world.min_x; x <= world.max_x; ++x) {
 			pair<int, int> pos{ x,y };
 
-			if (state.tiles.contains(pos)) {
-				char t = state.tiles.at(pos);
-				//draw(spacer);
-				if (t == 'X') {
-					draw(cap_player);
-					draw(spacer);
-				}
-				else if (t == 'R') {
-					draw(cap_repub);
-					draw(spacer);
-				}
-				else if (t == 'D') {
-					draw(cap_dict);
-					draw(spacer);
-				}
-				else if (t == 'N') {
-					draw(cap_negan);
-					draw(spacer);
-				}
-				else if (t == 'C') {
-					draw(occ_player);
-					draw(road);
-				}
-				else if (t == '1') {
-					draw(occ_enemy_1);
-					draw(road);
-				}
-				else if (t == '2') {
-					draw(occ_enemy_2);
-					draw(road);
-				}
-				else if (t == 'L') {
-					/*for (int i = 0; i < 5; i++) {
-						draw(water_tile);
-					}*/
-					draw(water_tile);
-					draw(water_tile);
-				}
-				else cout << t;
-				//draw(spacer);
+			char tc = tank_char_at(x, y, 5, 10);
+
+			if (tc != ' ') {
+				cout << tc;
 			}
 			else {
-				//draw(spacer);
-				draw(empty_tile);
-				draw(spacer);
-				//cout << colors::green << " . " << colors::color_reset;
+				if (state.tiles.contains(pos)) {
+					char t = state.tiles.at(pos);
+
+					if (t == 'X') {
+						draw(cap_player);
+						draw(spacer);
+					}
+					else if (t == 'R') {
+						draw(cap_repub);
+						draw(spacer);
+					}
+					else if (t == 'D') {
+						draw(cap_dict);
+						draw(spacer);
+					}
+					else if (t == 'N') {
+						draw(cap_negan);
+						draw(spacer);
+					}
+					else if (t == 'C') {
+						draw(player_tile);
+						draw(player_texture);
+					}
+					else if (t == '1') {
+						draw(occ_enemy_1);
+						draw(occ_enemy_texture);
+					}
+					else if (t == '2') {
+						draw(occ_enemy_texture);
+						draw(occ_enemy_2);
+					}
+					else if (t == 'L') {
+						draw(water_wave);
+						draw(water_tile);
+					}
+					else if (t == '9') {
+						draw(explosion_tile);
+						draw(explosion_tile);
+					}
+					else { cout << t; }
+				}
+				else {
+					draw(empty_tile);
+					draw(spacer);
+				}
 			}
-			
 		}
-		cout << endl;
-	}
-	
+		cout << '\n';
+	} 
 	blank_lines(2);
 }
 
+void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {
+	Bounds world;
+	world.min_x = -40;
+	world.max_x = 40;
+	world.min_y = -20;
+	world.max_y = 20;
+	int row = 0;
+	state.tank_active = true;
+
+	for (int y = world.max_y; y >= world.min_y; --y) {
+		
+		int gap = 5;
+
+		for (int x = world.min_x; x <= world.max_x; ++x) {
+			pair<int, int> pos{ x,y };
+
+			char tc = ' ';
+			if (state.tank_active /*&& x == state.tank_x && y == state.tank_y*/) {
+				tc = tank_char_at(x, y, state.tank_x, state.tank_y);
+			}
+			if (tc != ' ') {
+				frame += tc;
+				frame += " ";
+			}
+				else if (state.tiles.contains(pos)) {
+					char t = state.tiles.at(pos);
+
+					if (t == 'X') {
+						append_draw(frame, cap_player);
+						append_draw(frame, spacer);
+					}
+					else if (t == 'R') {
+						append_draw(frame, cap_repub);
+						append_draw(frame, spacer);
+					}
+					else if (t == 'D') {
+						append_draw(frame, cap_dict);
+						append_draw(frame, spacer);
+					}
+					else if (t == 'N') {
+						append_draw(frame, cap_negan);
+						append_draw(frame, spacer);
+					}
+					else if (t == 'C') {
+						append_draw(frame, player_tile);
+						append_draw(frame, player_texture);
+					}
+					else if (t == '1') {
+						append_draw(frame, occ_enemy_1);
+						append_draw(frame, occ_enemy_texture);
+					}
+					else if (t == '2') {
+						append_draw(frame, occ_enemy_texture2);
+						append_draw(frame, occ_enemy_2);
+					}
+					else if (t == 'L') {
+						append_draw(frame, water_wave);
+						append_draw(frame, water_tile);
+					}
+					else if (t == '9') {
+						append_draw(frame, explosion_tile);
+						append_draw(frame, explosion_tile);
+					}
+
+					else { frame+= t; }
+				}
+				else {
+					append_draw(frame, empty_tile);
+					append_draw(frame, spacer);
+				}
+			
+		}
+		
+		frame += string(gap, ' '); 
+		frame += msg_box_row(row);
+		frame += '\n';
+		row++;
+	}
+	//blank_lines(2);
+
+}
 
 void repeat_end_year(GameState& state, const map<int, string>& prod_menu) { // WORKING HERE.
 	int years = 0;
@@ -643,7 +1110,7 @@ bool attack_once(GameState& state) {
 	return true;
 };
 
-bool attack_neighbour_dir(GameState& state, Player* player,  string dir, Enemy* e1, Enemy* e2);
+bool single_attack(GameState& state, Player* player, string dir, Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y);
 
 //int count_controlled_tiles(const GameState& state);
 struct EnemyCounts {
@@ -652,46 +1119,43 @@ struct EnemyCounts {
 };
 EnemyCounts count_enemy_tiles(const GameState& state);
 
-void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2) {
-	int years = 0;
+void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y) {
+	int days = 0;	
 	
-	cout << "How many years/turns?" << endl;
-	cin >> years;
+	cout << "How many days/turns?" << endl;
+	cin >> days;
 	cout << "Direction? north/south/east/west/random/access to water" << endl;
 	cin >> state.direction;
 	
-	for (int i = 0; i < years; ++i) {
+	for (int i = 0; i < days; ++i) {
+		state.day++;
+		if (state.day % 365 == 0) {
+			state.year++;
+		}
 		string dir = state.direction;
 		if (dir == "random") {
 			dir = random_dir();
-			attack_neighbour_dir(state, player, dir, e1, e2);
 		}
-		/*else if (dir == "access to water") {
-			
-		}*/
-		else { 
-			attack_neighbour_dir(state,player, dir, e1, e2); }
+		else {
+			if (i % 2) {
+				dir = random_dir();
+			}
+		}
+		
+		single_attack(state, player, dir, e1, e2, e1x, e1y, e2x, e2y);
+
+		if (state.victory || state.gameover) {
+			break;
+		}
+
 	}
-	cout << "You now control " << count_controlled_tiles(state) << " territories/ km^2." << endl;
+	// add a "Press enter..." to make it show. Goal; stabilizing screen, avoid jumpy rendering...
+	/*cout << "You now control " << count_controlled_tiles(state) << " territories/ km^2." << endl;
 	cout << "Enemy 1 now controls " << count_enemy_tiles(state).e1 << " territories/ km^2." << endl;
 	cout << "Enemy 2 now controls " << count_enemy_tiles(state).e2 << " territories/ km^2." << endl;
-	cout << "The distance to Enemy 1 is: " << shooting_distance(e1) << endl;
+	cout << "The distance to Enemy 1 is: " << shooting_distance(e1) << endl;*/
 };
 
-//void repeat_attack(GameState& state, map<pair<int, int>, char>& tiles) {
-//	int years = 0;
-//	state.direction = "north";
-//	cout << "For how many years/turns do you want to attack in a row?" << endl;
-//	cin >> years;
-//	
-//	cout << "In what direction? north/south/east/west" << endl;
-//	cin >> state.direction;
-//	for (int i = 0; i < years; ++i) {
-//		state.state_of_war = "yes";
-//		attack_neighbour(state, tiles);
-//	};
-
-//};
 
 void show_map(const GameState& state,const Bounds& b) { 
 	blank_lines(2);
@@ -720,9 +1184,9 @@ void show_inventory(const map<string,double >& inventory ) {
 
 Bounds find_bounds(const GameState& state) {
 	int max_x = 0;
-	int max_y = 0;
+	int max_y = 39;
 	int min_x = 0;
-	int min_y = 0;
+	int min_y = 19;
 	
 	for (auto [pos,tile]: state.tiles) {
 		
@@ -731,7 +1195,7 @@ Bounds find_bounds(const GameState& state) {
 		min_x = min(min_x, pos.first);
 		min_y = min(min_y, pos.second);
 	}
-	return Bounds{max_x+10, max_y+10, min_x-10, min_y-10};
+	return Bounds{max_x, max_y, min_x, min_y};
 };
 
 Bounds find_bounds_player(const GameState& state) {
@@ -757,27 +1221,27 @@ Bounds find_bounds_player(const GameState& state) {
 }
 
 EnemyCounts count_enemy_tiles(const GameState& state);
-void flash_screen(const GameState& state, Bounds b);
+void flash_screen( GameState& state, string& frame, Bounds b);
 
-bool attack_neighbour_dir(GameState& state, Player* player,string dir,Enemy* e1, Enemy* e2) {
+
+bool single_attack(GameState& state, Player* player,string dir,Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y) {
 
 	bool success = false;
 	auto b_before = find_bounds_player(state);
 	char old_tile = 'w';
 	int sx, sy;
 
-	
 		if (state.frontier.empty()) {
 			sx = player->x;
 			sy = player->y;
 		}
 		else {
-			int i = rand() % state.frontier.size();
+			int i = rand() % state.frontier.size(); //**************
 			sx = state.frontier[i].first;
 			sy = state.frontier[i].second;
 		}
 
-		int nx = sx;
+		int nx = sx;					//initialization.
 		int ny = sy;
 
 		int attempts = 0;
@@ -786,7 +1250,7 @@ bool attack_neighbour_dir(GameState& state, Player* player,string dir,Enemy* e1,
 
 			attempts++;
 			old_tile = 'w';			// old_tile reset to avoid that a value stays stale across iterations. 
-			nx = sx;				//same thinking.
+			nx = sx;				//	same thinking.
 			ny = sy;
 
 			if (dir == "east")			nx = sx + 1;
@@ -798,21 +1262,47 @@ bool attack_neighbour_dir(GameState& state, Player* player,string dir,Enemy* e1,
 				old_tile = state.tiles.at({ nx,ny });
 			}
 
-			if (state.occupied.contains({ nx,ny }) && // if already occupied
-				!(old_tile == '1' || old_tile == '2') // and not an enemy tile
-				) {
-				dir = random_dir();					//roll the dice again. 
-				continue;							//restart loop.
-			}
+			if ((nx == e1x && ny == e1y) || (nx == e2x && ny == e2y)) { // if Player takes an Enemy capital; Victory.
+				set_tile(state, { nx,ny }, 'C');
+				state.victory = 1;
+					for (auto& [pos, tile] : state.tiles) {
+						if (tile == '1' || tile == '2') {
+							tile = 'C';
+						}
+					}
+					auto b_after = find_bounds_player(state);
 
-			if (!(nx == player->x && ny == player->y)) {
-				if (old_tile == '1' || old_tile == '2') {
-					flash_screen(state, b_before);
-				}
+					frame.clear();
+					update_msg_box(state);
+					show_minimap_to_frame(state, b_after, frame);
+					cout << terminal::clear_and_home;
+					cout << frame;
+
+				success = true;
+				return true;
+			}
+			else if (old_tile == '1' || old_tile == '2') {			//if enemy
+					//make_explosions(state, 5);
+					//flash_screen(state,frame, b_before);
+				
 				set_tile(state, { nx,ny }, 'C');
 				success = true;
 			}
-	}
+			
+			else if (state.occupied.contains({ nx,ny }) && // if already occupied
+				!(old_tile == '1' || old_tile == '2') // and not an enemy tile ...meaning if belonging to the Player.
+				) {
+				//dir = random_dir();					//roll the dice again.  *****************************************
+				int i = rand() % state.frontier.size(); 
+				sx = state.frontier[i].first;
+				sy = state.frontier[i].second;
+				continue;							//restart loop.
+			}
+
+		}
+		if (!(old_tile == '1' || old_tile == '2') && !(old_tile == 'C') && !(old_tile == 'X')) {
+			set_tile(state, { nx,ny }, 'C');
+		}
 
 		state.frontier.clear();
 
@@ -829,33 +1319,155 @@ bool attack_neighbour_dir(GameState& state, Player* player,string dir,Enemy* e1,
 				state.frontier.push_back(pos);            //add to state.frontier
 			}
 		}
+		
+	//enemy_attack_once(state, e1, '1');
+
+		if (state.day % 2 == 0) {
+			enemy_single_attack(state, dir, e1, e1x, e1y);
+			enemy2_single_attack(state, dir, e2, e2x, e2y);
+		}
+		else {
+			enemy2_single_attack(state, dir, e2, e2x, e2y);
+			enemy_single_attack(state, dir, e1, e1x, e1y);
+		}
+	
+	//enemy_attack_once(state, e2, '2');
 
 	auto b_after = find_bounds_player(state);
 
+	//show_minimap(state, b_after);
+	frame.clear();
+	update_msg_box(state);
+	show_minimap_to_frame(state, b_after, frame);
 	cout << terminal::clear_and_home;
-	show_minimap(state, b_after);
-
+	cout << frame;
+	
 	/*cout << "sx: " << sx << " sy: " << sy << endl;
 	cout << "nx: " << nx << " ny: " << ny << endl;*/
 
-	cout << "You now control " << count_controlled_tiles(state) << " territories/ km^2." << endl;
+	//cout << "You now control " << count_controlled_tiles(state) << " territories/ km^2." << endl;
 	/*cout << "Enemy 1 now controls " << count_enemy_tiles(state).e1 << " territories/ km^2." << endl;
 	cout << "Enemy 2 now controls " << count_enemy_tiles(state).e2 << " territories/ km^2." << endl;
 	cout << "The distance to Enemy 1 is: " << shooting_distance(e1) << endl;*/
 	this_thread::sleep_for(milliseconds(20));
-	cout << flush;
+	//cout << flush;
+
 	return success;
 }
 
+bool move_tanks(GameState& state, Bounds& b, int e1x, int e1y, int e2x, int e2y) {
+	//auto b_before = find_bounds_player(state);
+	//state.day += 1;
+	int days = 0;
+	Bounds world;
+	world.min_x = -40;
+	world.max_x = 40;
+	world.min_y = -20;
+	world.max_y = 20;
+	
+	cout << "In what direction should the Tank Divisions advance? north/south/east/west" << endl;
+	cin >> state.tank_dir;
+	string dir = state.tank_dir;
+
+	cout << "How many days in a row? (1 day = 1 tile)" << endl;
+	cin >> days;
+
+	//cout << "For how many turns? (max 10)" << endl;
+	for (int i = 0; i < days; i++) {
+		int sx, sy;
+
+		sx = state.tank_x;
+		sy = state.tank_y;
+
+		int nx, ny;
+
+		char old_tile = 'w';			// old_tile reset to avoid that a value stays stale across iterations. 
+		nx = sx;				//	same thinking.
+		ny = sy;
+
+		if (dir == "east")			nx = sx + 1;
+		else if (dir == "west")		nx = sx - 1;
+		else if (dir == "north")	ny = sy + 1;
+		else if (dir == "south")	ny = sy - 1;
+
+		if (( nx > world.max_x || nx < world.min_x) || (ny > world.max_y || ny < world.min_y)) {
+			cout << "Invalid coordinates!" << endl;
+			break;
+		}
+
+		if (state.tiles.contains({ nx,ny })) {
+			old_tile = state.tiles.at({ nx,ny });
+		}
+
+		state.day++;
+
+		if ((nx == e1x && ny == e1y) || (nx == e2x && ny == e2y)) { // if Player/Tank takes an Enemy capital; Victory.
+			set_tile(state, { nx,ny }, 'C');
+			state.victory = 1;
+			for (auto& [pos, tile] : state.tiles) {
+				if (tile == '1' || tile == '2') {
+					tile = 'C';
+				}
+			}
+			state.tank_x = nx;
+			state.tank_y = ny;
+			auto b_after = find_bounds_player(state);
+
+			frame.clear();
+			update_msg_box(state);
+			show_minimap_to_frame(state, b_after, frame);
+			cout << terminal::clear_and_home;
+			cout << frame;
+			//success = true;
+			return true;
+		}
+		else if (old_tile == '1' || old_tile == '2') {			//if enemy
+			//make_explosions(state, 5);
+			//flash_screen(state,frame, b_before);
+
+			set_tile(state, { nx,ny }, 'C');
+			state.tank_x = nx;
+			state.tank_y = ny;
+			//success = true;
+		}
+
+
+		if (!(old_tile == '1' || old_tile == '2') && !(old_tile == 'C') && !(old_tile == 'X')) {
+			set_tile(state, { nx,ny }, 'C');
+			state.tank_x = nx;
+			state.tank_y = ny;
+		}
+
+		if (old_tile == 'C' || old_tile == 'X') {
+			state.tank_x = nx;
+			state.tank_y = ny;
+		}
+
+		auto b_after = find_bounds_player(state);
+
+		frame.clear();
+		update_msg_box(state);
+		show_minimap_to_frame(state, b_after, frame);
+		cout << terminal::clear_and_home;
+		cout << frame;
+
+		state.tank_dir.clear();
+
+		
+	}
+	return true;
+}
+
+
 bool attack_neighbour(GameState& state,
 	Player* player,
-	Enemy* e1, Enemy* e2) {
-	cout << "Do you wish to attack a neighbor? ('yes' or 'no') If yes, in which direction? 'north/south/west/east' ?" << endl;
-	cin >> state.state_of_war >> state.direction;
+	Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y) {
+	cout << /*"Do you wish to attack a neighbor? ('yes' or 'no') If yes,*/ "in which direction? 'north/south/west/east' ?" << endl;
+	cin /*>> state.state_of_war*/ >> state.direction;
 
-	if (state.state_of_war != "yes") return false; 
+	//if (state.state_of_war != "yes") return false; 
 
-	return attack_neighbour_dir(state, player, state.direction, e1, e2);
+	return single_attack(state, player, state.direction, e1, e2, e1x, e1y, e2x, e2y);
 	} 
 
 int count_controlled_tiles(const GameState& state) {
@@ -880,7 +1492,7 @@ EnemyCounts count_enemy_tiles(const GameState& state) {
 	}
 	return counts;
 }
-void flash_screen(const GameState& state, Bounds b);
+void flash_screen(GameState& state, string& frame, Bounds b);
 
 void launch_missile(GameState& state, pair<int, int> start,pair<int, int> target,Bounds b) {
 	int x = start.first;
@@ -913,7 +1525,7 @@ void launch_missile(GameState& state, pair<int, int> start,pair<int, int> target
 	}
 		
 		cout << "HIT!" << endl;
-		flash_screen(state, b);
+		flash_screen(state, frame, b);
 		}
 
 void access_water(pair<int, int> start,pair<int, int> target,GameState& state, Enemy* e1, Enemy* e2) {
@@ -957,6 +1569,22 @@ void access_water(pair<int, int> start,pair<int, int> target,GameState& state, E
 //map<pair<int, int>, char> tiles;
 pair<int, int> lake_seed = random_coord();
 
+vector<pair<int,int>> make_full_circle(int cx, int cy, int radius) {
+	vector<pair<int, int>> tiles;
+
+	for (int y = cy - radius; y <= cy + radius; ++y) {
+		for (int x = cx - radius; x <= cx + radius; ++x) {
+			double dx = (x - cx); 
+			double dy = (y - cy); //*1.5; //compensating for the rectangular shape...terminal characters are twice as tall as they are wide. 
+
+			if (dx * dx + dy * dy <= radius * radius) {//Pythagore: sum of the squared sides of a right triangle equals the length of the hypotenuse squared.
+				tiles.push_back({x,y});
+			}
+		}
+	}
+	return tiles;
+}
+
 void basic_lake(GameState& state, pair<int, int>lake_seed, int number) {
 	pair<int,int> l = lake_seed;
 	for (int dx = 0; dx < number; dx++) {
@@ -967,26 +1595,94 @@ void basic_lake(GameState& state, pair<int, int>lake_seed, int number) {
 	}
 }
 
-void flash_screen(const GameState& state, Bounds b ) {
+void better_lake(GameState& state, pair<int,int> lake_seed, int radius) {
+	auto circle_tiles = make_full_circle(lake_seed.first, lake_seed.second, radius);
+	for (auto pos:circle_tiles) {
+		set_tile(state, { pos.first, pos.second }, 'L');
+	}
+}
+
+pair<int, int> target = { -40,-20 };
+vector<pair<int, int>> make_river_path(pair<int, int> lake_seed, pair<int, int> target) {
+	vector<pair<int, int>> tiles;
+	int x = lake_seed.first;
+	int y = lake_seed.second;
+
+	while (x != target.first || y != target.second) {
+		if (x < target.first) ++x;
+		else if (x > target.first) --x;
+		else if (y < target.second) ++y;
+		else if (y > target.second) --y;
+
+		tiles.push_back({ x,y });
+	}
+	return tiles;
+}
+
+void make_river(GameState& state, pair<int, int> lake_seed, pair<int, int> target) {
+	auto river_tiles = make_river_path(lake_seed, target);
+
+	for (auto pos : river_tiles) {
+		set_tile(state, { pos.first, pos.second }, 'L');
+	}
+}
+
+
+
+//void append_msg_box(string& frame, const vector<string>& lines) {
+//};
+
+void make_explosions(GameState& state, string frame, int number) {
+	for (int i = 0; i < number; i++) {
+		int radius = 4;
+		auto p = random_coord();
+		int cx = p.first;
+		int cy = p.second;
+		Bounds b = find_bounds_player(state);
+		frame.clear();
+
+		auto explosion_tiles = make_full_circle(cx, cy, radius); //I need to repeat/loop this one to get many circles. 
+
+		for (auto tile : explosion_tiles) {
+			set_tile(state, tile, '9');
+		}
+		cout << terminal::clear_and_home;
+		show_minimap_to_frame(state, b, frame);
+		cout << terminal::clear_and_home << frame;
+		this_thread::sleep_for(milliseconds(50));
+		//cout << std::flush;
+		for (auto tile: explosion_tiles) {
+			erase_tile(state, tile);
+		}
+	}
+}
+
+
+void flash_screen(GameState& state, string& frame, Bounds b ) {
 	
 	for (int tries = 0; tries < 6; tries++) {
-		cout << terminal::clear_and_home;
-		flashing = true;
-		show_minimap(state, b);
-		flashing = false;
-		cout << std::flush;
-		this_thread::sleep_for(milliseconds(10));
 		
-		cout << terminal::clear_and_home;
+		frame.clear();
+		flashing = true;
+		//make_explosions(state, 5);
+		//show_minimap(state, b);
+		show_minimap_to_frame(state, b, frame);
+		cout << terminal::clear_and_home << frame;
+		this_thread::sleep_for(milliseconds(50));
+		
+		frame.clear();
 		flashing = false;
-		show_minimap(state, b);
-		cout << std::flush;
-		this_thread::sleep_for(milliseconds(10));
+		//show_minimap(state, b);
+		show_minimap_to_frame(state, b, frame);
+		cout << terminal::clear_and_home << frame;
+		this_thread::sleep_for(milliseconds(50));
 	}
 }
 
 int main()
 {
+	cout << "\033[?25l";  // hide cursor
+	//ShowWindow(GetConsoleWindow(), SW_MAXIMIZE); //maximizing window; buggy. 
 	srand(time(nullptr));  //avoids making the same "random" path every time.
 
 	GameState state;
@@ -994,46 +1690,67 @@ int main()
 
 	//Enemy e1;
 	Enemy* e1 = new Enemy(); 
-	cout << "First enemy govt type: " << e1->get_type() << endl;
+	/*cout << "First enemy govt type: " << e1->get_type() << endl;
 	cout << "Enemy capital coord: "
 		<< e1->get_coord().first << "," << e1->get_coord().second << endl;
 	cout << "e1's first attack should be to the: " << random_dir() << endl;
-	blank_lines(2);
+	blank_lines(2);*/
 
 	//Enemy e2;
 	Enemy* e2 = new Enemy();
-	cout << "Second enemy govt type: " << e2->get_type() << endl;
+	/*cout << "Second enemy govt type: " << e2->get_type() << endl;
 	cout << "Second enemy coord: "
 		<< e2->get_coord().first << "," << e2->get_coord().second << endl; 
-	cout << "e2's first attack should be to the: " << random_dir() << endl;
+	cout << "e2's first attack should be to the: " << random_dir() << endl;*/
 
 	int sys_choice = 0;
 	cout << "\033[32m";
 	show_beta_banner();
 	cout << "\033[0m";
+	cout << "Maximize this window for a better gaming experience." << endl;
+
+	cout << colors::light_blue << "Some features are shown in blue because they are still under construction." << colors::color_reset << endl;;
+	cout << "Press Enter to continue...";
+	cin.get();
+	cout << terminal::clear_and_home;
+	Bounds b = find_bounds_player(state);
+	flash_screen(state,frame, b);
 
 	//tiles!
 	//map<pair<int, int>, char> tiles; 
 	state.tiles[{0, 0}] = 'X';
 	//working here for a while...
-	int e1_coord_first = e1->get_coord().first;
-	int e1_coord_second = e1->get_coord().second;
+	int e1x = e1->get_coord().first;
+	int e1y = e1->get_coord().second;
 
-	state.tiles[{e1_coord_first, e1_coord_second}] = info[e1->get_type()].symbol;
-	//this is where the govt type is written, not the '1' or '2' of occcupied tiles. 
+	int e2x = e2->get_coord().first;
+	int e2y = e2->get_coord().second;
+	
+	while (e1x == 0 && e1y == 0) {
+		auto p = random_coord();
+		e1x = p.first;
+		e1y = p.second;
+	}
+	state.tiles[{e1x, e1y}] = info[e1->get_type()].symbol;
+	e1->set_coord({ e1x , e1y });
 
-	int e2_coord_first = e2->get_coord().first;
-	int e2_coord_second = e2->get_coord().second;
-
-	state.tiles[{e2_coord_first, e2_coord_second}] = info[e2->get_type()].symbol;
-	//same; govt type of the capital, not occupied tiles. 
+	while ((e2x == 0 && e2y == 0) ||
+		   (e2x == e1x && e2y == e1y)) {
+		auto p = random_coord();
+		e2x = p.first;
+		e2y = p.second;
+	}
+	state.tiles[{e2x, e2y}] = info[e2->get_type()].symbol;
+	e2->set_coord({ e2x, e2y });
 
 	map<pair<int, int>, char> roads;
 	
 	/*tiles[{lake_seed.first, lake_seed.second}] = 'L';
 	tiles[{(lake_seed.first) + 1, lake_seed.second}] = 'L';*/
 	
-	//basic_lake(state, lake_seed, 7);
+	//basic_lake(state, lake_seed, 5);
+	//better_lake(state, lake_seed, 4);
+	//make_river(state, lake_seed, target);
 
 	int bank_choice = 0;
 
@@ -1049,10 +1766,13 @@ int main()
 		{99, "Set current year production"}
 	};
 
-	while (sys_choice != 999) {
+	while (sys_choice != 999 && !state.victory && !state.gameover) {						// Gameloop.
 		auto bounds = normalize(find_bounds(state));
 		//show_map(tiles, bounds);
-		show_minimap(state, find_bounds_player(state));
+		frame.clear();
+		show_minimap_to_frame(state, b, frame);
+		cout << terminal::clear_and_home << frame;
+		//show_minimap(state, find_bounds_player(state));
 		sys_choice = show_sys_menu(sys_menu);
 		blank_lines(2);
 
@@ -1065,20 +1785,24 @@ int main()
 		{
 			int war_choice = 0;
 
-			while (war_choice != 9) {
+			while (war_choice != 9 && !state.victory && !state.gameover) {
 				//show_map(tiles, normalize(bounds));
 				war_choice = show_war_menu();
 				switch (war_choice) {
 				case 1:
 				{
-					attack_neighbour(state, player, e1, e2);
+					repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
+					//attack_neighbour(state, player, e1, e2, e1x, e1y, e2x, e2y);
 					/*enemy_attack_once(tiles, e1);
 					enemy_attack_once(tiles, e2);*/
 					break;
 				}
-					/*case 2:
+					case 2:
+						move_tanks(state, b, e1x, e1y, e2x, e2y);
 						break;
-					case 3:
+
+
+					/*case 3:
 						break;*/
 				case 4: 
 				{auto bounds = find_bounds(state);
@@ -1138,7 +1862,7 @@ int main()
 		{
 			int test_choice = 0;
 
-			while (test_choice != 9) {
+			while (test_choice != 9 && !state.victory && !state.gameover) {
 				test_choice = show_test_menu(test_menu);  //working here. 
 				
 				switch (test_choice) {
@@ -1147,7 +1871,7 @@ int main()
 					break;
 
 				case 2:
-					repeat_attack(state, player, e1, e2);
+					repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
 					break;
 
 				case 3:
@@ -1170,7 +1894,16 @@ int main()
 				case 5:
 				{
 					Bounds b = find_bounds(state);
-					flash_screen(state, b);
+					flash_screen(state, frame, b);
+					break;
+				}
+				case 6:
+				{
+					int number = 0;
+					cout << "How many?" << endl;
+					cin >> number;
+					make_explosions(state, frame, number);
+					//show_minimap(state, b);
 					break;
 				}
 
@@ -1183,6 +1916,8 @@ int main()
 		case 999: break;
 		}
 	}
+	
+	cout << "\033[?25h";  // show cursor again
 }
 	
 	
