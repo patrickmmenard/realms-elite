@@ -299,6 +299,7 @@ struct GameState {
 	int tank_x = 1;
 	int tank_y = 0;
 	string tank_dir;
+	char reset_answer = 'y';
 };
 
 void update_msg_box(const GameState& state){
@@ -1292,10 +1293,17 @@ bool single_attack(GameState& state, Player* player,string dir,Enemy* e1, Enemy*
 			else if (state.occupied.contains({ nx,ny }) && // if already occupied
 				!(old_tile == '1' || old_tile == '2') // and not an enemy tile ...meaning if belonging to the Player.
 				) {
-				//dir = random_dir();					//roll the dice again.  *****************************************
-				int i = rand() % state.frontier.size(); 
-				sx = state.frontier[i].first;
-				sy = state.frontier[i].second;
+				//dir = random_dir();	
+				// 				//roll the dice again.  *****************************************
+				if (state.frontier.empty()) {
+					sx = player->x;
+					sy = player->y;
+				}
+				else {
+					int i = rand() % state.frontier.size(); //**************
+					sx = state.frontier[i].first;
+					sy = state.frontier[i].second;
+				}
 				continue;							//restart loop.
 			}
 
@@ -1679,52 +1687,28 @@ void flash_screen(GameState& state, string& frame, Bounds b ) {
 	}
 }
 
-int main()
-{
-	cout << "\033[?25l";  // hide cursor
-	//ShowWindow(GetConsoleWindow(), SW_MAXIMIZE); //maximizing window; buggy. 
-	srand(time(nullptr));  //avoids making the same "random" path every time.
+void reset_game(GameState& state) {
+	//it resets major stuff like year and day to 0, and calls the stuff necessary at the start, remaking random coord capitals.
+	state.year = 0;
+	state.day = 0;
+	state.victory = 0;
+	state.gameover = 0;
+	state.tiles.clear();
+	state.frontier.clear();
+	state.frontier_e1.clear();
+	state.frontier_e2.clear();
+	state.occupied.clear();
+}
 
-	GameState state;
-	Player* player = new Player();  // "()" means constructor 
-
-	//Enemy e1;
-	Enemy* e1 = new Enemy(); 
-	/*cout << "First enemy govt type: " << e1->get_type() << endl;
-	cout << "Enemy capital coord: "
-		<< e1->get_coord().first << "," << e1->get_coord().second << endl;
-	cout << "e1's first attack should be to the: " << random_dir() << endl;
-	blank_lines(2);*/
-
-	//Enemy e2;
-	Enemy* e2 = new Enemy();
-	/*cout << "Second enemy govt type: " << e2->get_type() << endl;
-	cout << "Second enemy coord: "
-		<< e2->get_coord().first << "," << e2->get_coord().second << endl; 
-	cout << "e2's first attack should be to the: " << random_dir() << endl;*/
-
-	int sys_choice = 0;
-	cout << "\033[32m";
-	show_beta_banner();
-	cout << "\033[0m";
-	cout << "Maximize this window for a better gaming experience." << endl;
-
-	cout << colors::light_blue << "Some features are shown in blue because they are still under construction." << colors::color_reset << endl;;
-	cout << "Press Enter to continue...";
-	cin.get();
+void initialize_game(GameState& state, Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y, string frame, Bounds b) {
+	
 	cout << terminal::clear_and_home;
-	Bounds b = find_bounds_player(state);
-	flash_screen(state,frame, b);
+	b = find_bounds_player(state);
+	flash_screen(state, frame, b);
 
 	//tiles!
 	//map<pair<int, int>, char> tiles; 
 	state.tiles[{0, 0}] = 'X';
-	//working here for a while...
-	int e1x = e1->get_coord().first;
-	int e1y = e1->get_coord().second;
-
-	int e2x = e2->get_coord().first;
-	int e2y = e2->get_coord().second;
 	
 	while (e1x == 0 && e1y == 0) {
 		auto p = random_coord();
@@ -1735,13 +1719,51 @@ int main()
 	e1->set_coord({ e1x , e1y });
 
 	while ((e2x == 0 && e2y == 0) ||
-		   (e2x == e1x && e2y == e1y)) {
+		(e2x == e1x && e2y == e1y)) {
 		auto p = random_coord();
 		e2x = p.first;
 		e2y = p.second;
 	}
 	state.tiles[{e2x, e2y}] = info[e2->get_type()].symbol;
 	e2->set_coord({ e2x, e2y });
+}
+
+int main()
+{
+	GameState state;
+	Player* player = new Player();  // "()" means constructor 
+
+	//Enemy e1;
+	Enemy* e1 = new Enemy();
+
+	//Enemy e2;
+	Enemy* e2 = new Enemy();
+
+	int e1x = e1->get_coord().first;
+	int e1y = e1->get_coord().second;
+
+	int e2x = e2->get_coord().first;
+	int e2y = e2->get_coord().second;
+
+	int sys_choice = 0;
+
+	srand(time(nullptr));  //avoids making the same "random" path every time.
+
+	cout << "\033[?25l";  // hide cursor
+	//ShowWindow(GetConsoleWindow(), SW_MAXIMIZE); //maximizing window; buggy. 
+
+	cout << "\033[32m";
+	show_beta_banner();
+	cout << "\033[0m";
+	cout << "Maximize this window for a better gaming experience." << endl;
+
+	cout << colors::light_blue << "Some features are shown in blue because they are still under construction." << colors::color_reset << endl;;
+	cout << "Press Enter to continue...";
+	cin.get();
+
+	cout << terminal::clear_and_home;
+	Bounds b = find_bounds_player(state);
+	flash_screen(state,frame, b);
 
 	map<pair<int, int>, char> roads;
 	
@@ -1754,8 +1776,6 @@ int main()
 
 	int bank_choice = 0;
 
-	//GameState state;
-
 	map<int, string> prod_menu = {
 		{1, "Jets"},
 		{2, "Tanks"},
@@ -1766,157 +1786,173 @@ int main()
 		{99, "Set current year production"}
 	};
 
-	while (sys_choice != 999 && !state.victory && !state.gameover) {						// Gameloop.
-		auto bounds = normalize(find_bounds(state));
-		//show_map(tiles, bounds);
-		frame.clear();
-		show_minimap_to_frame(state, b, frame);
-		cout << terminal::clear_and_home << frame;
-		//show_minimap(state, find_bounds_player(state));
-		sys_choice = show_sys_menu(sys_menu);
-		blank_lines(2);
-
-		switch (sys_choice) {
-		case 1:show_map(state, bounds);
-			show_prod_menu(prod_menu, state);
+	while (state.reset_answer == 'y') {
+		
+		initialize_game(state, e1, e2, e1x, e1y, e2x, e2y, frame, b);
+		while (sys_choice != 999 && !state.victory && !state.gameover) {						// Gameloop.
+			auto bounds = normalize(find_bounds(state));
+			//show_map(tiles, bounds);
+			frame.clear();
+			show_minimap_to_frame(state, b, frame);
+			cout << terminal::clear_and_home << frame;
+			//show_minimap(state, find_bounds_player(state));
+			sys_choice = show_sys_menu(sys_menu);
 			blank_lines(2);
-			break;
-		case 3:
-		{
-			int war_choice = 0;
 
-			while (war_choice != 9 && !state.victory && !state.gameover) {
-				//show_map(tiles, normalize(bounds));
-				war_choice = show_war_menu();
-				switch (war_choice) {
-				case 1:
-				{
-					repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
-					//attack_neighbour(state, player, e1, e2, e1x, e1y, e2x, e2y);
-					/*enemy_attack_once(tiles, e1);
-					enemy_attack_once(tiles, e2);*/
-					break;
-				}
+			switch (sys_choice) {
+			case 1:show_map(state, bounds);
+				show_prod_menu(prod_menu, state);
+				blank_lines(2);
+				break;
+			case 3:
+			{
+				int war_choice = 0;
+
+				while (war_choice != 9 && !state.victory && !state.gameover) {
+					//show_map(tiles, normalize(bounds));
+					war_choice = show_war_menu();
+					switch (war_choice) {
+					case 1:
+					{
+						repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
+						//attack_neighbour(state, player, e1, e2, e1x, e1y, e2x, e2y);
+						/*enemy_attack_once(tiles, e1);
+						enemy_attack_once(tiles, e2);*/
+						break;
+					}
 					case 2:
-						move_tanks(state, b, e1x, e1y, e2x, e2y);
+						if (state.year >= 1) {
+							move_tanks(state, b, e1x, e1y, e2x, e2y);
+						}
+						else {
+							cout << "Tank divisions will be available at the end of this Production Year." << endl;
+						}
 						break;
 
-
-					/*case 3:
-						break;*/
-				case 4: 
-				{auto bounds = find_bounds(state);
-				show_map(state, bounds); }
+						/*case 3:
+							break;*/
+					case 4:
+					{
+						auto bounds = find_bounds(state);
+						show_map(state, bounds);
+					}
 					break;
 					}
 				}
 			}
 			break;
+
+			case 4:
+			{
+				int bank_choice = 0;
+				while (bank_choice != 9) {
+					bank_choice = show_bank_menu();
+					switch (bank_choice) {
+					case 1:
+						set_interest_rate(state);
+						cout << "New interest rate: " << state.interest_rate << "%" << endl;
+						break;
+					case 2:
+						take_a_loan(state);
+						cout << state.new_debt << " $ have been added to your account. Annual payments will start at the end of the current year." << endl;
+						break;
+						//	case 3:
+						//	{ 3, "Invest" }
+						//	break;
+						//	case 4:
+						//	{ 4, "Print money" }
+						//	break;
+						//	case 5:
+						//	{ 5, "Buy Food" }
+						//	break;
+						//	case 6:
+						//	{ 6, "Sell Food" }
+						//	break;
+						//	case 9:
+						//	{ 9, "Return to System Menu" }
+						//	break;
+
+					case 9:
+						break;
+						blank_lines(2);
+					}
+				}
+				break;
+			}
+			case 6: { show_end_year_menu(state, prod_menu); }
+				  break;
+			case 7:
+				show_status(state);
+				show_map(state, normalize(bounds));
+				blank_lines(2);
+				break;
+
+			case 8:
+			{
+				int test_choice = 0;
+
+				while (test_choice != 9 && !state.victory && !state.gameover) {
+					test_choice = show_test_menu(test_menu);  //working here. 
+
+					switch (test_choice) {
+					case 1:
+						repeat_end_year(state, prod_menu);
+						break;
+
+					case 2:
+						repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
+						break;
+
+					case 3:
+					{
+						Bounds world = find_bounds(state);
+						pair<int, int> start = { 0,0 };
+						pair<int, int> target = { e1->get_coord().first, e1->get_coord().second };
+
+						launch_missile(state, start, target, world);
+						break;
+					}
+					case 4:
+					{
+						Bounds world = find_bounds(state);
+						pair<int, int> start = { state.current_x, state.current_y };
+						pair<int, int> target = { lake_seed.first, lake_seed.second };
+						access_water(start, target, state, e1, e2);
+						break;
+					}
+					case 5:
+					{
+						Bounds b = find_bounds(state);
+						flash_screen(state, frame, b);
+						break;
+					}
+					case 6:
+					{
+						int number = 0;
+						cout << "How many?" << endl;
+						cin >> number;
+						make_explosions(state, frame, number);
+						//show_minimap(state, b);
+						break;
+					}
+
+					case 9:
+						break;
+					}
+				}
+				break;
+			}
+			case 999: break;
+			}
+		}
+		cout << "Do you want to play again?" << endl;
+		cin >> state.reset_answer;
+		if (state.reset_answer == 'y') {
+			reset_game(state);
+			
+		}
 		
-		case 4:
-		{
-			int bank_choice = 0;
-			while (bank_choice != 9) {
-				bank_choice = show_bank_menu();
-				switch (bank_choice) {
-				case 1:
-					set_interest_rate(state);
-					cout << "New interest rate: " << state.interest_rate << "%" << endl;
-					break;
-				case 2:
-					take_a_loan(state);
-					cout << state.new_debt << " $ have been added to your account. Annual payments will start at the end of the current year." << endl;
-					break;
-					//	case 3:
-					//	{ 3, "Invest" }
-					//	break;
-					//	case 4:
-					//	{ 4, "Print money" }
-					//	break;
-					//	case 5:
-					//	{ 5, "Buy Food" }
-					//	break;
-					//	case 6:
-					//	{ 6, "Sell Food" }
-					//	break;
-					//	case 9:
-					//	{ 9, "Return to System Menu" }
-					//	break;
-
-				case 9:
-					break;
-					blank_lines(2);
-				}
-			}
-			break;
-		}
-		case 6: { show_end_year_menu(state, prod_menu); }
-			break;
-		case 7:
-			show_status(state);
-			show_map(state, normalize(bounds));
-			blank_lines(2);
-			break;
-
-		case 8: 
-		{
-			int test_choice = 0;
-
-			while (test_choice != 9 && !state.victory && !state.gameover) {
-				test_choice = show_test_menu(test_menu);  //working here. 
-				
-				switch (test_choice) {
-				case 1:
-					repeat_end_year(state, prod_menu);
-					break;
-
-				case 2:
-					repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
-					break;
-
-				case 3:
-				{
-					Bounds world = find_bounds(state);
-					pair<int, int> start = { 0,0 };
-					pair<int, int> target = { e1->get_coord().first, e1->get_coord().second };
-
-					launch_missile(state, start, target, world);
-					break;
-				}
-				case 4:
-				{	
-					Bounds world = find_bounds(state);
-					pair<int, int> start = {state.current_x, state.current_y};
-					pair<int, int> target = {lake_seed.first, lake_seed.second};
-					access_water(start, target, state, e1, e2);
-					break;
-				}
-				case 5:
-				{
-					Bounds b = find_bounds(state);
-					flash_screen(state, frame, b);
-					break;
-				}
-				case 6:
-				{
-					int number = 0;
-					cout << "How many?" << endl;
-					cin >> number;
-					make_explosions(state, frame, number);
-					//show_minimap(state, b);
-					break;
-				}
-
-				case 9:
-					break;
-				}
-			}
-			break;
-		}
-		case 999: break;
-		}
 	}
-	
 	cout << "\033[?25h";  // show cursor again
 }
 	
