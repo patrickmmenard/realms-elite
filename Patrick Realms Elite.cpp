@@ -46,7 +46,7 @@ namespace colors {
 
 namespace terminal {
 	const string clear = "\x1b[2J";
-	const string home = "\x1b[H";
+	const string home =	 "\x1b[H";
 	const string clear_and_home = "\x1b[2J\x1b[H";
 }
 
@@ -91,6 +91,10 @@ vector<string> tank_art = {
 	"OOOO"
 };
 
+vector<string> jet_art = {
+	"--o-(_)-o--"
+};
+
 string frame;
 
 bool flashing = false;
@@ -127,19 +131,19 @@ void append_draw(string& frame, const Glyph& g) {
 	else { frame += g.symbol; }
 }
 
-void draw_tank(int cx, int cy) {
-	for (int row = 0; row < tank_art.size(); ++row) {
-		for (int col = 0; col < tank_art[row].size(); ++col) {
-
-			char c = tank_art[row][col];
-			if (c == ' ') continue;
-
-			int x = cx + col;
-			int y = cy - row;
-		
-		}
-	}
-}
+//void draw_tank(int cx, int cy) {
+//	for (int row = 0; row < tank_art.size(); ++row) {
+//		for (int col = 0; col < tank_art[row].size(); ++col) {
+//
+//			char c = tank_art[row][col];
+//			if (c == ' ') continue;
+//
+//			int x = cx + col;
+//			int y = cy - row;
+//		
+//		}
+//	}
+//}
 
 char tank_char_at(int x, int y, int cx, int cy) {
 	int local_col = x - cx;
@@ -151,6 +155,18 @@ char tank_char_at(int x, int y, int cx, int cy) {
 	return tank_art[local_row][local_col];
 
 }
+
+char unit_char_at(int x, int y, int cx, int cy, const vector<string>& art) {		//generalized version. 
+	int local_col = x - cx;
+	int local_row = cy - y;
+
+	if (local_row < 0 || local_row >= art.size()) return ' ';
+	if (local_col < 0 || local_col >= art[local_row].size()) return ' ';
+
+	return art[local_row][local_col];
+
+}
+
 
 //Patrick's little helpers!
 void blank_lines(int n) {
@@ -259,6 +275,13 @@ struct PairHash{
 		}
 };
 
+struct Bounds {
+	int max_x;
+	int max_y;
+	int min_x;
+	int min_y;
+};
+
 struct GameState {
 	
 	long long population = 10000000;
@@ -300,6 +323,14 @@ struct GameState {
 	int tank_y = 0;
 	string tank_dir;
 	char reset_answer = 'y';
+
+	bool jet_active = 1;
+	int jet_x = -20;
+	int jet_y = 20;
+	int jet_target = jet_x;
+	int jet_dir = 1;
+
+	Bounds world;				//yes, a struct inside a struct...
 };
 
 void update_msg_box(const GameState& state){
@@ -408,21 +439,17 @@ bool enemy_attack_once(GameState& state, Enemy* enemy, char sym) {
 	return false;
 };
 
-struct Bounds {
-	int max_x;
-	int max_y;
-	int min_x;
-	int min_y;
-};
+
 
 Bounds find_bounds_player(const GameState& state);
 
-bool enemy_single_attack(GameState& state, string dir, Enemy* e1, int e1x, int e1y) {  //new version of enemy_attack_once(); based on functional (92% acquisition) attack_neighbour_dir
-
+bool enemy_single_attack(GameState& state, string dir, Enemy* e1, int e1x, int e1y) {  //new version of enemy_attack_once(); based on functional (92% acquisition) attack_neighbour_dir(renamed)
+																					   //basis for enemy2; avoid hardcoded stuff in next version!
 	bool success = false;
 	auto b_before = find_bounds_player(state);
 	char old_tile = 'w';
 	int sx, sy;
+	dir = random_dir();			//avoids mimicking Player's direction.
 	
 	if (state.frontier_e1.empty()) {
 		sx = e1->get_coord().first;
@@ -538,6 +565,7 @@ bool enemy2_single_attack(GameState& state, string dir, Enemy* e2, int e2x, int 
 	auto b_before = find_bounds_player(state);
 	char old_tile = 'w';
 	int sx, sy;
+	dir = random_dir();
 
 	if (state.frontier_e2.empty()) {
 		sx = e2->get_coord().first;
@@ -949,10 +977,11 @@ void show_minimap(const GameState& state, const Bounds& b) {
 			pair<int, int> pos{ x,y };
 
 			char tc = tank_char_at(x, y, 5, 10);
-
+			
 			if (tc != ' ') {
 				cout << tc;
 			}
+			
 			else {
 				if (state.tiles.contains(pos)) {
 					char t = state.tiles.at(pos);
@@ -1014,6 +1043,9 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {
 	world.max_y = 20;
 	int row = 0;
 	state.tank_active = true;
+	state.jet_active = true;
+	Glyph g;
+	g.use_color = false;
 
 	for (int y = world.max_y; y >= world.min_y; --y) {
 		
@@ -1023,13 +1055,26 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {
 			pair<int, int> pos{ x,y };
 
 			char tc = ' ';
+			char jc = ' ';
 			if (state.tank_active /*&& x == state.tank_x && y == state.tank_y*/) {
 				tc = tank_char_at(x, y, state.tank_x, state.tank_y);
 			}
+			if (state.jet_active) {
+				jc = unit_char_at(x, y, state.jet_x, state.jet_y, jet_art);
+			}
+			
 			if (tc != ' ') {
-				frame += tc;
+				/*frame += tc;
+				frame += " ";*/
+				g.symbol = string(1, tc);
+				append_draw(frame, g);
+				append_draw(frame, spacer);
+			}
+			else if (jc != ' ') {
+				frame += jc;
 				frame += " ";
 			}
+			
 				else if (state.tiles.contains(pos)) {
 					char t = state.tiles.at(pos);
 
@@ -1224,6 +1269,7 @@ Bounds find_bounds_player(const GameState& state) {
 EnemyCounts count_enemy_tiles(const GameState& state);
 void flash_screen( GameState& state, string& frame, Bounds b);
 
+void move_jet(GameState& state);
 
 bool single_attack(GameState& state, Player* player,string dir,Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y) {
 
@@ -1275,6 +1321,7 @@ bool single_attack(GameState& state, Player* player,string dir,Enemy* e1, Enemy*
 
 					frame.clear();
 					update_msg_box(state);
+					move_jet(state);
 					show_minimap_to_frame(state, b_after, frame);
 					cout << terminal::clear_and_home;
 					cout << frame;
@@ -1311,6 +1358,7 @@ bool single_attack(GameState& state, Player* player,string dir,Enemy* e1, Enemy*
 		if (!(old_tile == '1' || old_tile == '2') && !(old_tile == 'C') && !(old_tile == 'X')) {
 			set_tile(state, { nx,ny }, 'C');
 		}
+		move_jet(state);
 
 		state.frontier.clear();
 
@@ -1464,6 +1512,16 @@ bool move_tanks(GameState& state, Bounds& b, int e1x, int e1y, int e2x, int e2y)
 		
 	}
 	return true;
+}
+
+void move_jet(GameState& state) {
+	state.jet_x += state.jet_dir;
+
+	if (state.jet_x <= state.world.min_x || state.jet_x >= state.world.max_x) {
+		state.jet_dir *= -1;
+	}
+
+	state.jet_target = state.jet_x;
 }
 
 
@@ -1700,7 +1758,7 @@ void reset_game(GameState& state) {
 	state.occupied.clear();
 }
 
-void initialize_game(GameState& state, Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y, string frame, Bounds b) {
+void initialize_game(GameState& state, Enemy* e1, Enemy* e2, string frame, Bounds b) {
 	
 	cout << terminal::clear_and_home;
 	b = find_bounds_player(state);
@@ -1709,7 +1767,11 @@ void initialize_game(GameState& state, Enemy* e1, Enemy* e2, int e1x, int e1y, i
 	//tiles!
 	//map<pair<int, int>, char> tiles; 
 	state.tiles[{0, 0}] = 'X';
-	
+
+	auto p = random_coord();
+	int e1x = p.first;
+	int e1y = p.second;
+
 	while (e1x == 0 && e1y == 0) {
 		auto p = random_coord();
 		e1x = p.first;
@@ -1717,6 +1779,10 @@ void initialize_game(GameState& state, Enemy* e1, Enemy* e2, int e1x, int e1y, i
 	}
 	state.tiles[{e1x, e1y}] = info[e1->get_type()].symbol;
 	e1->set_coord({ e1x , e1y });
+
+	auto q = random_coord();
+	int e2x = q.first;
+	int e2y = q.second;
 
 	while ((e2x == 0 && e2y == 0) ||
 		(e2x == e1x && e2y == e1y)) {
@@ -1730,7 +1796,13 @@ void initialize_game(GameState& state, Enemy* e1, Enemy* e2, int e1x, int e1y, i
 
 int main()
 {
+	
 	GameState state;
+	state.world.min_x = -40;
+	state.world.max_x = 40;
+	state.world.min_y = -20;
+	state.world.max_y = 20;
+
 	Player* player = new Player();  // "()" means constructor 
 
 	//Enemy e1;
@@ -1739,17 +1811,20 @@ int main()
 	//Enemy e2;
 	Enemy* e2 = new Enemy();
 
-	int e1x = e1->get_coord().first;
+	Bounds b = find_bounds_player(state);
+	//initialize_game(state, e1, e2, frame, b); 
+
+	/*int e1x = e1->get_coord().first;
 	int e1y = e1->get_coord().second;
 
 	int e2x = e2->get_coord().first;
-	int e2y = e2->get_coord().second;
+	int e2y = e2->get_coord().second;*/
 
 	int sys_choice = 0;
 
-	srand(time(nullptr));  //avoids making the same "random" path every time.
+	
 
-	cout << "\033[?25l";  // hide cursor
+	cout << "\033[?25l";  // hides cursor
 	//ShowWindow(GetConsoleWindow(), SW_MAXIMIZE); //maximizing window; buggy. 
 
 	cout << "\033[32m";
@@ -1762,7 +1837,7 @@ int main()
 	cin.get();
 
 	cout << terminal::clear_and_home;
-	Bounds b = find_bounds_player(state);
+	
 	flash_screen(state,frame, b);
 
 	map<pair<int, int>, char> roads;
@@ -1787,8 +1862,10 @@ int main()
 	};
 
 	while (state.reset_answer == 'y') {
-		
-		initialize_game(state, e1, e2, e1x, e1y, e2x, e2y, frame, b);
+		srand(time(nullptr));  //avoids making the same "random" path every time.
+		initialize_game(state, e1, e2, frame, b);
+		auto [e1x, e1y] = e1->get_coord();
+		auto [e2x, e2y] = e2->get_coord();
 		while (sys_choice != 999 && !state.victory && !state.gameover) {						// Gameloop.
 			auto bounds = normalize(find_bounds(state));
 			//show_map(tiles, bounds);
