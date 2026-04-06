@@ -18,6 +18,7 @@
 #include "random_utils.h"
 #include <windows.h>
 #include <cmath>
+#include <conio.h>
 //#include <function>
 using namespace std;
 using namespace std::chrono;
@@ -68,6 +69,7 @@ const Glyph cap_player{ "X", colors::color_reset, colors::none };
 const Glyph cap_dict{ "D", colors::color_reset, colors::none };
 const Glyph cap_negan{ "N", colors::color_reset, colors::none };
 const Glyph cap_repub{ "R", colors::color_reset, colors::none };
+const Glyph cap_blackadder{"B", colors::color_reset, colors::none};
 const Glyph occ_player{ "C", colors::blue, colors::none };
 
 const Glyph empty_tile{ ".", colors::green, colors::none };
@@ -201,9 +203,10 @@ struct GovtInfo {
 
 map<string, GovtInfo> info =  //more to come...
 {
-		{"Republic",	{'R', 1, 0}},			//attack,defense bonuses...
-		{"Dictatorship",{'D', 3, 0}},
-		{"Negan",		{'N', 2, 1}},
+		{"Republic",		{'R', 1, 0}},			//attack,defense bonuses...
+		{"Dictatorship",	{'D', 3, 0}},
+		{"Negan",			{'N', 2, 1}},
+		{"Cmd Blackadder",	{'B', 0, 3}}
 };
 
 string random_dir() {
@@ -331,6 +334,7 @@ struct GameState {
 	int jet_dir = 1;
 
 	Bounds world;				//yes, a struct inside a struct...
+	bool pause = false;
 };
 
 void update_msg_box(const GameState& state){
@@ -387,7 +391,7 @@ public:
 	long long food = 10000000;
 };
 	
-bool enemy_attack_once(GameState& state, Enemy* enemy, char sym) {
+bool enemy_attack_once(GameState& state, Enemy* enemy, char sym) {			// DEPRECATED 
 
 	auto [x,y] = enemy->get_coord();
 	//vector<pair<int, int>> sources;
@@ -438,7 +442,6 @@ bool enemy_attack_once(GameState& state, Enemy* enemy, char sym) {
 	}
 	return false;
 };
-
 
 
 Bounds find_bounds_player(const GameState& state);
@@ -725,7 +728,9 @@ map<int, string> war_menu = {
 		{2, "Move Tanks"},
 		{3, "Buy Turrets"}, 
 		{4, "Show current map"},
+		{5, "Pause/Resume: press P to stop during attacks."},
 		{9, "Return to System Menu"}
+		
 };
 
 map<int, string> test_menu = {
@@ -1035,7 +1040,7 @@ void show_minimap(const GameState& state, const Bounds& b) {
 	blank_lines(2);
 }
 
-void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {
+void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {			//Rendering.
 	Bounds world;
 	world.min_x = -40;
 	world.max_x = 40;
@@ -1092,6 +1097,10 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {
 					}
 					else if (t == 'N') {
 						append_draw(frame, cap_negan);
+						append_draw(frame, spacer);
+					}
+					else if (t == 'B') {
+						append_draw(frame, cap_blackadder);
 						append_draw(frame, spacer);
 					}
 					else if (t == 'C') {
@@ -1174,6 +1183,23 @@ void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e
 	cin >> state.direction;
 	
 	for (int i = 0; i < days; ++i) {
+
+		if (_kbhit()) {
+			char ch = _getch();
+			if (ch == 'p' || ch == 'P') {
+				state.pause = !state.pause;
+				cout << "PAUSED\n";
+			}
+		}
+		while (state.pause) {
+			if (_kbhit()) {
+				char ch = _getch();
+				if (ch == 'p' || ch == 'P') {
+					state.pause = false;
+				}
+			}
+		}
+
 		state.day++;
 		if (state.day % 365 == 0) {
 			state.year++;
@@ -1796,7 +1822,7 @@ void initialize_game(GameState& state, Enemy* e1, Enemy* e2, string frame, Bound
 
 int main()
 {
-	
+
 	GameState state;
 	state.world.min_x = -40;
 	state.world.max_x = 40;
@@ -1822,7 +1848,7 @@ int main()
 
 	int sys_choice = 0;
 
-	
+
 
 	cout << "\033[?25l";  // hides cursor
 	//ShowWindow(GetConsoleWindow(), SW_MAXIMIZE); //maximizing window; buggy. 
@@ -1837,14 +1863,14 @@ int main()
 	cin.get();
 
 	cout << terminal::clear_and_home;
-	
-	flash_screen(state,frame, b);
+
+	flash_screen(state, frame, b);
 
 	map<pair<int, int>, char> roads;
-	
+
 	/*tiles[{lake_seed.first, lake_seed.second}] = 'L';
 	tiles[{(lake_seed.first) + 1, lake_seed.second}] = 'L';*/
-	
+
 	//basic_lake(state, lake_seed, 5);
 	//better_lake(state, lake_seed, 4);
 	//make_river(state, lake_seed, target);
@@ -1886,15 +1912,12 @@ int main()
 				int war_choice = 0;
 
 				while (war_choice != 9 && !state.victory && !state.gameover) {
-					//show_map(tiles, normalize(bounds));
 					war_choice = show_war_menu();
+
 					switch (war_choice) {
 					case 1:
 					{
 						repeat_attack(state, player, e1, e2, e1x, e1y, e2x, e2y);
-						//attack_neighbour(state, player, e1, e2, e1x, e1y, e2x, e2y);
-						/*enemy_attack_once(tiles, e1);
-						enemy_attack_once(tiles, e2);*/
 						break;
 					}
 					case 2:
@@ -1906,18 +1929,25 @@ int main()
 						}
 						break;
 
-						/*case 3:
-							break;*/
+
 					case 4:
 					{
 						auto bounds = find_bounds(state);
 						show_map(state, bounds);
+						break;
 					}
-					break;
+
+					case 5: 
+					
+					{
+						state.pause = !state.pause;
+						break;
+					}
 					}
 				}
+				break;
 			}
-			break;
+
 
 			case 4:
 			{
@@ -1969,7 +1999,7 @@ int main()
 				int test_choice = 0;
 
 				while (test_choice != 9 && !state.victory && !state.gameover) {
-					test_choice = show_test_menu(test_menu);  //working here. 
+					test_choice = show_test_menu(test_menu);   
 
 					switch (test_choice) {
 					case 1:
@@ -2015,22 +2045,23 @@ int main()
 
 					case 9:
 						break;
+
 					}
+					break;
 				}
-				break;
+			//case 999: break;
 			}
-			case 999: break;
 			}
+			cout << "Do you want to play again?" << endl;
+			cin >> state.reset_answer;
+			if (state.reset_answer == 'y') {
+				reset_game(state);
+			}
+
+
 		}
-		cout << "Do you want to play again?" << endl;
-		cin >> state.reset_answer;
-		if (state.reset_answer == 'y') {
-			reset_game(state);
-			
-		}
-		
+		cout << "\033[?25h";  // show cursor again
 	}
-	cout << "\033[?25h";  // show cursor again
 }
 	
 	
