@@ -87,6 +87,7 @@ const Glyph water_wave{ "~", colors::light_blue, colors::blue_bg};
 const Glyph player_tile{" ", colors::none, colors::violet_bg};
 const Glyph player_texture{".", colors::grey, colors::violet_bg};
 const Glyph explosion_tile{" ", colors::none, colors::white_bg};
+const Glyph bomb{ "*", colors::grey, colors::none};
 
 vector<string> tank_art = {
 	".||= ",
@@ -332,6 +333,15 @@ struct GameState {
 	int jet_y = 20;
 	int jet_target = jet_x;
 	int jet_dir = 1;
+
+	bool bomb_is_flying = false; 
+	int bomb_start_x;
+	int bomb_start_y;
+	int bomb_target_x;
+	int bomb_target_y;
+	int bomb_x;
+	int bomb_y;
+	int bomb_dir;
 
 	Bounds world;				//yes, a struct inside a struct...
 	bool pause = false;
@@ -1040,7 +1050,7 @@ void show_minimap(const GameState& state, const Bounds& b) {
 	blank_lines(2);
 }
 
-void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {			//Rendering.
+void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Rendering.
 	Bounds world;
 	world.min_x = -40;
 	world.max_x = 40;
@@ -1061,6 +1071,7 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {			//Re
 
 			char tc = ' ';
 			char jc = ' ';
+			char bc = ' ';
 			if (state.tank_active /*&& x == state.tank_x && y == state.tank_y*/) {
 				tc = tank_char_at(x, y, state.tank_x, state.tank_y);
 			}
@@ -1075,9 +1086,14 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string & frame) {			//Re
 				append_draw(frame, g);
 				append_draw(frame, spacer);
 			}
+
 			else if (jc != ' ') {
 				frame += jc;
 				frame += " ";
+			}
+			else if (state.bomb_is_flying == true && x == state.bomb_x && y == state.bomb_y) {
+				append_draw(frame, bomb);
+				append_draw(frame, spacer);
 			}
 			
 				else if (state.tiles.contains(pos)) {
@@ -1174,6 +1190,8 @@ struct EnemyCounts {
 };
 EnemyCounts count_enemy_tiles(const GameState& state);
 
+void update_bomb(GameState& state);
+
 void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y) {
 	int days = 0;	
 	
@@ -1189,6 +1207,8 @@ void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e
 			if (ch == 'p' || ch == 'P') {
 				state.pause = !state.pause;
 				cout << "PAUSED\n";
+				cout << "To drop a bomb, press 'b'." << endl;
+				cout << "To resume, press 'p'." << endl;
 			}
 		}
 		while (state.pause) {
@@ -1197,9 +1217,28 @@ void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e
 				if (ch == 'p' || ch == 'P') {
 					state.pause = false;
 				}
+				else if (ch == 'b' || ch == 'B') {
+					state.bomb_is_flying = true;
+					
+					state.bomb_start_x = state.jet_x;
+					state.bomb_start_y = state.jet_y;
+					state.bomb_x = state.bomb_start_x;
+					state.bomb_y = state.bomb_start_y; 
+					state.bomb_dir = state.jet_dir;
+					
+					state.bomb_target_y = state.world.min_y;
+
+					int dy = state.bomb_start_y - state.world.min_y;
+					int dx = 2*dy;
+
+					state.bomb_target_x = state.bomb_start_x + (state.bomb_dir * dx);
+					
+
+					state.pause = false;
+				}
 			}
 		}
-
+		update_bomb(state);
 		state.day++;
 		if (state.day % 365 == 0) {
 			state.year++;
@@ -1550,6 +1589,31 @@ void move_jet(GameState& state) {
 	state.jet_target = state.jet_x;
 }
 
+bool launch_bomb(GameState& state) {
+	state.bomb_is_flying = true;
+	return state.bomb_is_flying;
+};
+
+void apply_explosion(GameState& state, int cx, int cy);
+
+void update_bomb(GameState& state) {
+	if (!state.bomb_is_flying) return;
+
+	int& y = state.bomb_y;
+	int& x = state.bomb_x;
+
+	if (x != state.bomb_target_x || y != state.bomb_target_y) {  //each turn, just once
+		y -= 1;
+		x = x + 2 * (state.bomb_dir);
+	}
+
+	if (x == state.bomb_target_x && y == state.bomb_target_y) {
+		apply_explosion(state, x, y);
+		state.bomb_is_flying = false;
+	}
+}
+
+
 
 bool attack_neighbour(GameState& state,
 	Player* player,
@@ -1747,6 +1811,24 @@ void make_explosions(GameState& state, string frame, int number) {
 			erase_tile(state, tile);
 		}
 	}
+}
+
+void apply_explosion(GameState& state, int cx, int cy) {
+	int radius = 4;
+	//auto p = random_coord();
+	//int cx = p.first;
+	//int cy = p.second;
+	Bounds b = find_bounds_player(state);
+
+	auto explosion_tiles = make_full_circle(cx, cy, radius); //I need to repeat/loop this one to get many circles. 
+
+	for (auto tile : explosion_tiles) {
+		set_tile(state, tile, '9');
+	}
+	for (auto tile : explosion_tiles) {
+		erase_tile(state, tile);
+	}
+
 }
 
 
