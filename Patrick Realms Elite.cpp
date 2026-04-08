@@ -1727,10 +1727,10 @@ void access_water(pair<int, int> start,pair<int, int> target,GameState& state, E
 
 	cout << "WATER!" << endl;
 }
-//pair<int, int> lake_seed = random_coord();
+pair<int, int> lake_seed = random_coord();
 
 //map<pair<int, int>, char> tiles;
-pair<int, int> lake_seed = random_coord();
+//pair<int, int> lake_seed = random_coord();
 
 vector<pair<int,int>> make_full_circle(int cx, int cy, int radius) {
 	vector<pair<int, int>> tiles;
@@ -1771,11 +1771,35 @@ vector<pair<int, int>> make_river_path(pair<int, int> lake_seed, pair<int, int> 
 	int x = lake_seed.first;
 	int y = lake_seed.second;
 
-	while (x != target.first || y != target.second) {
+	/*while (x != target.first || y != target.second) {
 		if (x < target.first) ++x;
 		else if (x > target.first) --x;
 		else if (y < target.second) ++y;
-		else if (y > target.second) --y;
+		else if (y > target.second) --y;*/
+
+	int distance = abs(target.first - lake_seed.first) + abs(target.second - lake_seed.second);
+
+	for (int i = 0; i < distance; i++){
+		if (i % 2 == 0) {
+			if (x != target.first) {
+				if (x < target.first) ++x;
+				else  --x;
+			}
+			else {
+				if (y < target.second) ++y;
+				else if (y > target.second) --y;
+			}
+
+		} else {
+			if (y != target.second) {
+				if (y < target.second) ++y;
+				else --y;
+			}
+			else {
+				if (x < target.first) ++x;
+				else if (x > target.first)--x;
+			}
+		}
 
 		tiles.push_back({ x,y });
 	}
@@ -1876,7 +1900,7 @@ void reset_game(GameState& state) {
 
 }
 
-void initialize_game(GameState& state,Player* player, Enemy* e1, Enemy* e2, string frame, Bounds b) {
+void initialize_game(GameState& state, Player* player, Enemy* e1, Enemy* e2, string frame, Bounds b) {
 	
 	cout << terminal::clear_and_home;
 	b = find_bounds_player(state);
@@ -1885,6 +1909,10 @@ void initialize_game(GameState& state,Player* player, Enemy* e1, Enemy* e2, stri
 	//tiles!
 	//map<pair<int, int>, char> tiles; 
 	state.tiles[{0, 0}] = 'X';
+
+	pair<int, int> lake_seed = random_coord();
+	better_lake(state, lake_seed, 4);
+	make_river(state, lake_seed, target);
 
 	auto p = random_coord();
 	int e1x = p.first;
