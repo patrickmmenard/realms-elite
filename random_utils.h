@@ -3,6 +3,10 @@
 #include <string>
 #include <utility>
 
+std::pair<int, int> random_coord();
+
+struct GameState;
+
 extern std::vector<std::string> govt_names;
 std::string random_govt_type(const std::vector<std::string>& govt_names);
 std::pair<int, int> random_coord();

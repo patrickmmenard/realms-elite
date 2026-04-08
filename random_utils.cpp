@@ -17,7 +17,8 @@ string random_govt_type(const vector<string>& govt_names) {
 pair<int, int> random_coord() {
 	pair<int, int>p;
 	do {
-		p = { rand_int(-20, 20), rand_int(-20,20) };
+		p = { rand_int(-20, 20), 
+			  rand_int(-20, 20) };
 	} while (p.first == 0 && p.second == 0);
 	return p;
 }

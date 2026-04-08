@@ -1,5 +1,6 @@
 #include "Enemy.h"
 #include "random_utils.h"
+
 using namespace std;
 
 	Enemy:: Enemy() {

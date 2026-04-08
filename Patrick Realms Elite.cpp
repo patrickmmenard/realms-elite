@@ -18,7 +18,9 @@
 #include "random_utils.h"
 #include <windows.h>
 #include <cmath>
+
 #include <conio.h>
+
 //#include <function>
 using namespace std;
 using namespace std::chrono;
@@ -1607,13 +1609,18 @@ void update_bomb(GameState& state) {
 		x = x + 2 * (state.bomb_dir);
 	}
 
-	if (x == state.bomb_target_x && y == state.bomb_target_y) {
+	char old_tile = 'w';
+	if (state.tiles.contains({ x,y })) {
+		old_tile = state.tiles.at({ x,y });
+	}
+
+	if (old_tile == '1' || old_tile == '2' || old_tile == 'C' ||
+		(x == state.bomb_target_x && y == state.bomb_target_y)){
+
 		apply_explosion(state, x, y);
 		state.bomb_is_flying = false;
 	}
 }
-
-
 
 bool attack_neighbour(GameState& state,
 	Player* player,
@@ -1819,12 +1826,13 @@ void apply_explosion(GameState& state, int cx, int cy) {
 	//int cx = p.first;
 	//int cy = p.second;
 	Bounds b = find_bounds_player(state);
-
+	
 	auto explosion_tiles = make_full_circle(cx, cy, radius); //I need to repeat/loop this one to get many circles. 
 
 	for (auto tile : explosion_tiles) {
 		set_tile(state, tile, '9');
 	}
+
 	for (auto tile : explosion_tiles) {
 		erase_tile(state, tile);
 	}
@@ -1864,9 +1872,11 @@ void reset_game(GameState& state) {
 	state.frontier_e1.clear();
 	state.frontier_e2.clear();
 	state.occupied.clear();
+	state.bomb_is_flying = false;
+
 }
 
-void initialize_game(GameState& state, Enemy* e1, Enemy* e2, string frame, Bounds b) {
+void initialize_game(GameState& state,Player* player, Enemy* e1, Enemy* e2, string frame, Bounds b) {
 	
 	cout << terminal::clear_and_home;
 	b = find_bounds_player(state);
@@ -1880,14 +1890,14 @@ void initialize_game(GameState& state, Enemy* e1, Enemy* e2, string frame, Bound
 	int e1x = p.first;
 	int e1y = p.second;
 
-	while (e1x == 0 && e1y == 0) {
+	while /*(e1x == 0 && e1y == 0) || */(abs(e1x) + abs(e1y) < 10){ // Puts distance between enemy respawn and player and avoid player and enemy spawning at same spot.
 		auto p = random_coord();
 		e1x = p.first;
 		e1y = p.second;
 	}
 	state.tiles[{e1x, e1y}] = info[e1->get_type()].symbol;
 	e1->set_coord({ e1x , e1y });
-
+	
 	auto q = random_coord();
 	int e2x = q.first;
 	int e2y = q.second;
@@ -1904,6 +1914,7 @@ void initialize_game(GameState& state, Enemy* e1, Enemy* e2, string frame, Bound
 
 int main()
 {
+	srand(time(nullptr));  //avoids making the same "random" path every time.
 
 	GameState state;
 	state.world.min_x = -40;
@@ -1911,13 +1922,17 @@ int main()
 	state.world.min_y = -20;
 	state.world.max_y = 20;
 
-	Player* player = new Player();  // "()" means constructor 
+	//Player* player = new Player();  // "()" means constructor 
 
-	//Enemy e1;
-	Enemy* e1 = new Enemy();
+	////Enemy e1;
+	//Enemy* e1 = new Enemy();
 
-	//Enemy e2;
-	Enemy* e2 = new Enemy();
+	////Enemy e2;
+	//Enemy* e2 = new Enemy();
+
+	Player* player = nullptr;
+	Enemy* e1 = nullptr;
+	Enemy* e2 = nullptr;
 
 	Bounds b = find_bounds_player(state);
 	//initialize_game(state, e1, e2, frame, b); 
@@ -1929,8 +1944,6 @@ int main()
 	int e2y = e2->get_coord().second;*/
 
 	int sys_choice = 0;
-
-
 
 	cout << "\033[?25l";  // hides cursor
 	//ShowWindow(GetConsoleWindow(), SW_MAXIMIZE); //maximizing window; buggy. 
@@ -1948,7 +1961,7 @@ int main()
 
 	flash_screen(state, frame, b);
 
-	map<pair<int, int>, char> roads;
+	//map<pair<int, int>, char> roads;
 
 	/*tiles[{lake_seed.first, lake_seed.second}] = 'L';
 	tiles[{(lake_seed.first) + 1, lake_seed.second}] = 'L';*/
@@ -1970,8 +1983,17 @@ int main()
 	};
 
 	while (state.reset_answer == 'y') {
-		srand(time(nullptr));  //avoids making the same "random" path every time.
-		initialize_game(state, e1, e2, frame, b);
+		sys_choice = 0;
+
+		delete player;
+		delete e1;
+		delete e2;
+
+		player = new Player();
+		e1 = new Enemy();
+		e2 = new Enemy();
+		initialize_game(state, player, e1, e2, frame, b);
+		
 		auto [e1x, e1y] = e1->get_coord();
 		auto [e2x, e2y] = e2->get_coord();
 		while (sys_choice != 999 && !state.victory && !state.gameover) {						// Gameloop.
@@ -2138,6 +2160,7 @@ int main()
 			cin >> state.reset_answer;
 			if (state.reset_answer == 'y') {
 				reset_game(state);
+				sys_choice = 999;
 			}
 
 
