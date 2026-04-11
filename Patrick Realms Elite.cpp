@@ -43,6 +43,8 @@ namespace colors {
 	const string violet_bg = "\033[48;5;54m";
 
 	const string green_bg = "\033[48;5;58m";
+	const string orange = "\033[38;5;208m9"; 
+	const string orange_bg = "\033[48;5;208m";
 
 	const string color_reset = "\033[0m";
 }
@@ -89,6 +91,7 @@ const Glyph water_wave{ "~", colors::light_blue, colors::blue_bg};
 const Glyph player_tile{" ", colors::none, colors::violet_bg};
 const Glyph player_texture{".", colors::grey, colors::violet_bg};
 const Glyph explosion_tile{" ", colors::none, colors::white_bg};
+const Glyph explosion_tile_orange{" ", colors::none, colors::orange_bg};
 const Glyph bomb{ "*", colors::grey, colors::none};
 
 vector<string> tank_art = {
@@ -1141,6 +1144,11 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Ren
 						append_draw(frame, explosion_tile);
 						append_draw(frame, explosion_tile);
 					}
+					else if (t == '8') {
+						append_draw(frame, explosion_tile_orange);
+						append_draw(frame, explosion_tile_orange);
+					}
+
 
 					else { frame+= t; }
 				}
@@ -1766,6 +1774,7 @@ void better_lake(GameState& state, pair<int,int> lake_seed, int radius) {
 }
 
 pair<int, int> target = { -40,-20 };
+
 vector<pair<int, int>> make_river_path(pair<int, int> lake_seed, pair<int, int> target) {
 	vector<pair<int, int>> tiles;
 	int x = lake_seed.first;
@@ -1821,26 +1830,44 @@ void make_river(GameState& state, pair<int, int> lake_seed, pair<int, int> targe
 
 void make_explosions(GameState& state, string frame, int number) {
 	for (int i = 0; i < number; i++) {
-		int radius = 4;
+		int radius = rand_int(2,5);
 		auto p = random_coord();
 		int cx = p.first;
 		int cy = p.second;
 		Bounds b = find_bounds_player(state);
-		frame.clear();
-
+	
 		auto explosion_tiles = make_full_circle(cx, cy, radius); //I need to repeat/loop this one to get many circles. 
-
+		auto explosion_tiles_orange = make_full_circle(cx+1, cy+1, radius  +1);
+	
 		for (auto tile : explosion_tiles) {
 			set_tile(state, tile, '9');
 		}
-		cout << terminal::clear_and_home;
+
+		frame.clear();
 		show_minimap_to_frame(state, b, frame);
 		cout << terminal::clear_and_home << frame;
-		this_thread::sleep_for(milliseconds(50));
-		//cout << std::flush;
-		for (auto tile: explosion_tiles) {
+		this_thread::sleep_for(milliseconds(70));
+		
+		for (auto tile : explosion_tiles_orange) {
+			set_tile(state, tile, '8');
+		}
+
+		frame.clear();
+		show_minimap_to_frame(state, b, frame);
+		cout << terminal::clear_and_home << frame;
+		this_thread::sleep_for(milliseconds(90));
+
+		for (auto tile : explosion_tiles) {
 			erase_tile(state, tile);
 		}
+		for (auto tile: explosion_tiles_orange) {
+			erase_tile(state, tile);
+		}
+
+		if (i > 0 && i % 4 == 0) {
+			this_thread::sleep_for(milliseconds(10));
+		}
+		
 	}
 }
 
@@ -1905,6 +1932,7 @@ void initialize_game(GameState& state, Player* player, Enemy* e1, Enemy* e2, str
 	cout << terminal::clear_and_home;
 	b = find_bounds_player(state);
 	flash_screen(state, frame, b);
+	make_explosions(state, frame, 15);
 
 	//tiles!
 	//map<pair<int, int>, char> tiles; 
@@ -1987,7 +2015,7 @@ int main()
 
 	cout << terminal::clear_and_home;
 
-	flash_screen(state, frame, b);
+	//flash_screen(state, frame, b);
 
 	//map<pair<int, int>, char> roads;
 
