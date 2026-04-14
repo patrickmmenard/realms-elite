@@ -737,7 +737,7 @@ map<int, string> sys_menu = {
 		{5, "Civilian Affairs"},
 		{6, "End Year Turn"}, 
 		{7, "Status"},
-		{8, "Testing"},
+		//{8, "Testing"},
 		{999, "Quit"}
 };
 
@@ -794,10 +794,34 @@ int show_sys_menu(map<int, string> sys_menu) {
 	int choice = 0;
 	cout << "_____" << "System Menu" << "_____" << endl;
 	for (auto [number, menu] : sys_menu) {
-		cout << number << " " << menu << endl;
+		if (number != 3 && number != 999) {
+			cout << colors::blue << number << " " << menu << colors::color_reset << endl;
+		}
+		else {
+			cout << number << " " << menu << endl;
+		}
 	}
-	cin >> choice;
-	return choice;
+
+		while (true) {
+			cin >> choice;
+
+			if (!cin) {
+				cin.clear();
+				cin.ignore(10000, '\n');
+				cout << "Invalid input." << endl;
+				continue;
+			}
+
+			if (choice != 3 && choice != 999) {
+				cout << "Not available yet." << endl;
+			}
+			else if (choice == 999) {
+				return 999;
+			}
+			else { break; }
+		}
+		return choice;
+	
 }
 
 int show_bank_menu() {
@@ -814,10 +838,35 @@ int show_war_menu() {
 	int choice = 0;
 	cout << "_____" << "War Menu" << "_____" << endl;
 	for (auto [number, item]: war_menu) {
-		cout << number << ": " << item << endl;
+
+		if (number != 1 && number != 2 && number != 9) {
+			cout << colors::blue <<  number << ": " << item << colors::color_reset << endl;
+		}
+		else { cout << number << ": " << item  << endl; }
 	}
-	cin >> choice;
-	return choice;
+
+	while (true) {
+		cin >> choice;
+
+		if (!cin) {
+			cin.clear();
+			cin.ignore(10000, '\n');
+			cout << "Invalid input." << endl;
+			continue;
+		
+		}
+
+		if (choice == 1 || choice == 2) {
+			return choice;
+		}
+		else if (choice == 9) {
+			return choice;
+		}
+		else {
+			cout << "Not available yet." << endl;
+		}
+	}
+	//return choice;
 }
 
 int show_test_menu(map<int, string> test_menu) {
