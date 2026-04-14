@@ -84,7 +84,7 @@ const Glyph occ_enemy_2{ "#", colors::grey, colors::green_bg };
 const Glyph occ_enemy_texture2{ "3", colors::none, colors::green_bg };
 
 const Glyph road{"-", colors::grey, colors::none };
-const Glyph spacer{ " ",colors::none, colors::none, false };
+const Glyph spacer{ " ", colors::none, colors::none, false };
 const Glyph water_tile{ " ","", colors::blue_bg };
 const Glyph water_wave{ "~", colors::light_blue, colors::blue_bg};
 
@@ -231,11 +231,11 @@ vector<string> messages = {
 
 vector <string> box_lines = {
 	"===============",
-	"=             =",
-	"=             =",
-	"=             =",
-	"=             =",
-	"=             =",
+	"= Our true    =",
+	"= enemy       =",
+	"= has yet     =",
+	"= to reveal   =",
+	"= himself.    =",
 	"==============="
 };
 
@@ -348,32 +348,45 @@ struct GameState {
 	int bomb_y;
 	int bomb_dir;
 
+	int moves_left = 0;
+	string enemy1_name;
+	string enemy2_name;
+
 	Bounds world;				//yes, a struct inside a struct...
 	bool pause = false;
 };
+
+//string opp_name( Enemy* e) {
+//	string t = e->get_type();
+//	return t; 
+//}
 
 void update_msg_box(const GameState& state){
 	box_lines[0] = "===============";
 
 	string state_year = to_string(state.year);
-	string show_year = "= Year:" + state_year + "  =";
+	string show_year = "  Year:" + state_year + "   ";
+	
+	box_lines[2] = "  E1:" + state.enemy1_name + "   ";
+	box_lines[3] = "  E2:" + state.enemy2_name + "   ";
 	box_lines[4] = show_year;
 
 	string state_day = to_string(state.day);
-	string show_day = "= Day:" + state_day + "  =";
+	string show_day = "  Day:" + state_day + "   ";
 	box_lines[5] = show_day;
 
 	if (state.victory == 1) {
-		box_lines[1] =	"= Victory!    =";
-		box_lines[2] =	"=             ="; 
+		box_lines[1] =	"  Victory!     ";
+		//box_lines[2] =	"=             ="; 
 	}
 	else if (state.gameover == 1) {
-		box_lines[1] = "= Game Over!  =";
-		box_lines[2] = "=             =";
+		box_lines[1] = "  Game Over!   ";
+		//box_lines[2] = "=             =";
 	}
 	else {
-		box_lines[1] = "=             =";
-		box_lines[2] = "=             =";
+		box_lines[1] = "               ";
+		//box_lines[2] = "=             =";
+
 	}
 }
 
@@ -1055,6 +1068,21 @@ void show_minimap(const GameState& state, const Bounds& b) {
 	blank_lines(2);
 }
 
+string background_at(GameState& state, int x, int y) {
+	pair<int, int> pos{x,y};
+
+	if (!state.tiles.contains(pos)) return "";	//guard clause. 
+	
+		char t = state.tiles.at(pos);
+
+		if (t == 'C') return player_tile.background;
+		if (t == '1') return occ_enemy_1.background;
+		if (t == '2') return occ_enemy_2.background;
+		if (t == 'L') return water_tile.background;
+		
+		return "";
+}
+
 void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Rendering.
 	Bounds world;
 	world.min_x = -40;
@@ -1065,7 +1093,10 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Ren
 	state.tank_active = true;
 	state.jet_active = true;
 	Glyph g;
-	g.use_color = false;
+	Glyph bg;
+	g.use_color = true;
+	bg.use_color = true;
+	
 
 	for (int y = world.max_y; y >= world.min_y; --y) {
 		
@@ -1073,10 +1104,12 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Ren
 
 		for (int x = world.min_x; x <= world.max_x; ++x) {
 			pair<int, int> pos{ x,y };
+			string current_bg_color = background_at(state, x, y);
 
 			char tc = ' ';
 			char jc = ' ';
 			char bc = ' ';
+			char empty = ' ';
 			if (state.tank_active /*&& x == state.tank_x && y == state.tank_y*/) {
 				tc = tank_char_at(x, y, state.tank_x, state.tank_y);
 			}
@@ -1087,9 +1120,12 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Ren
 			if (tc != ' ') {
 				/*frame += tc;
 				frame += " ";*/
+				g.background = current_bg_color;
+				bg.background = current_bg_color;
 				g.symbol = string(1, tc);
+				bg.symbol = string(1, empty);
 				append_draw(frame, g);
-				append_draw(frame, spacer);
+				append_draw(frame, bg);
 			}
 
 			else if (jc != ' ') {
@@ -1149,7 +1185,6 @@ void show_minimap_to_frame(GameState& state, Bounds& b, string& frame) {			//Ren
 						append_draw(frame, explosion_tile_orange);
 					}
 
-
 					else { frame+= t; }
 				}
 				else {
@@ -1205,10 +1240,44 @@ void update_bomb(GameState& state);
 void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e1x, int e1y, int e2x, int e2y) {
 	int days = 0;	
 	
-	cout << "How many days/turns?" << endl;
-	cin >> days;
-	cout << "Direction? north/south/east/west/random/access to water" << endl;
-	cin >> state.direction;
+	while (true) {
+		cout << "How many days/turns?" << endl;
+		cin >> days;
+
+		if (!cin) {
+			cin.clear();
+			cin.ignore(10000, '\n');
+			cout << "Please enter a valid number." << endl;
+			continue;
+		}
+
+		if (days > 366 || days <= 0) {
+			cout << "Attacks can be planned for a maximum of 366 days in advance." << endl;
+			continue;
+		}
+		break;
+	}
+	while (true) {
+		cout << "Direction? north/south/east/west/random" << endl;
+		cin >> state.direction;
+		if (!cin) {
+			cin.clear();
+			cin.ignore(10000, '\n');
+			cout << "Please enter a valid direction." << endl;
+			continue;
+		}
+
+		if (
+			state.direction == "north" ||
+			state.direction == "south" ||
+			state.direction == "west" ||
+			state.direction == "east" ||
+			state.direction == "random") {
+			break;
+		}
+		cout << "Please enter north, south, west, east or random." << endl;
+
+	}
 	
 	for (int i = 0; i < days; ++i) {
 
@@ -1252,6 +1321,7 @@ void repeat_attack(GameState& state, Player* player, Enemy* e1, Enemy* e2, int e
 		state.day++;
 		if (state.day % 365 == 0) {
 			state.year++;
+			state.moves_left = 3;
 		}
 		string dir = state.direction;
 		if (dir == "random") {
@@ -1495,16 +1565,41 @@ bool move_tanks(GameState& state, Bounds& b, int e1x, int e1y, int e2x, int e2y)
 	world.max_x = 40;
 	world.min_y = -20;
 	world.max_y = 20;
-	
-	cout << "In what direction should the Tank Divisions advance? north/south/east/west" << endl;
-	cin >> state.tank_dir;
+
+	while (true) {
+		cout << "In what direction should the Tank Divisions advance? north/south/east/west" << endl;
+		cin >> state.tank_dir;
+
+		if (!cin) {
+			cin.clear();
+			cin.ignore(10000, '\n');
+			cout << "Please enter a valid direction." << endl;
+			continue;
+		}
+
+		 if(state.tank_dir == "north" ||
+			state.tank_dir == "south" ||
+			state.tank_dir == "west" ||
+			state.tank_dir == "east" ||
+			state.tank_dir == "random") {
+			break;
+		}
+		cout << "Please enter north, south, west, east or random." << endl;
+}
+
 	string dir = state.tank_dir;
 
 	cout << "How many days in a row? (1 day = 1 tile)" << endl;
 	cin >> days;
+	if (days > state.moves_left) {
+		cout << "Tanks only have " << state.moves_left << " moves left this year. Enter a new number of days/moves." << endl;
+		return false;
+	}
+	
 
 	//cout << "For how many turns? (max 10)" << endl;
 	for (int i = 0; i < days; i++) {
+		state.moves_left--;
 		int sx, sy;
 
 		sx = state.tank_x;
@@ -1788,7 +1883,25 @@ vector<pair<int, int>> make_river_path(pair<int, int> lake_seed, pair<int, int> 
 
 	int distance = abs(target.first - lake_seed.first) + abs(target.second - lake_seed.second);
 
-	for (int i = 0; i < distance; i++){
+	int dx = (target.first > x) - (target.first < x);	//Boolean magic! ex.:"1 - 0 = 1"...
+	int dy = (target.second > y) - (target.second < y);
+
+	for (int i = 0; i < distance; i++) {
+		bool move_x = (i % 2 == 0);
+
+		if (move_x && x != target.first) {
+			x += dx;
+		}
+		else if (!move_x && y != target.second) {
+			y += dy;
+		}
+		else {										//Covering all cases! Fallback block. 
+			if (x != target.first) x += dx;
+			else if (y != target.second) y += dy;
+		}
+	
+
+	/*for (int i = 0; i < distance; i++){
 		if (i % 2 == 0) {
 			if (x != target.first) {
 				if (x < target.first) ++x;
@@ -1808,7 +1921,7 @@ vector<pair<int, int>> make_river_path(pair<int, int> lake_seed, pair<int, int> 
 				if (x < target.first) ++x;
 				else if (x > target.first)--x;
 			}
-		}
+		}*/
 
 		tiles.push_back({ x,y });
 	}
@@ -1924,6 +2037,11 @@ void reset_game(GameState& state) {
 	state.frontier_e2.clear();
 	state.occupied.clear();
 	state.bomb_is_flying = false;
+	state.tank_x = 1;
+	state.tank_y = 0;
+	state.jet_x = -20;
+	state.jet_y = 20;
+
 
 }
 
@@ -1953,6 +2071,7 @@ void initialize_game(GameState& state, Player* player, Enemy* e1, Enemy* e2, str
 	}
 	state.tiles[{e1x, e1y}] = info[e1->get_type()].symbol;
 	e1->set_coord({ e1x , e1y });
+	state.enemy1_name = e1->get_type();
 	
 	auto q = random_coord();
 	int e2x = q.first;
@@ -1966,6 +2085,7 @@ void initialize_game(GameState& state, Player* player, Enemy* e1, Enemy* e2, str
 	}
 	state.tiles[{e2x, e2y}] = info[e2->get_type()].symbol;
 	e2->set_coord({ e2x, e2y });
+	state.enemy2_name = e2->get_type();
 }
 
 int main()
@@ -2009,9 +2129,19 @@ int main()
 	cout << "\033[0m";
 	cout << "Maximize this window for a better gaming experience." << endl;
 
-	cout << colors::light_blue << "Some features are shown in blue because they are still under construction." << colors::color_reset << endl;;
-	cout << "Press Enter to continue...";
-	cin.get();
+	cout << colors::light_blue << "Some features are shown in blue because they are still under construction." << colors::color_reset << endl;
+
+	while (true) {
+		cout << "Press Enter to continue...";
+		string line;
+		getline(cin, line);
+
+		if (line.empty()) {
+			break;
+		}
+
+		cout << "Just press Enter." << endl;
+	}
 
 	cout << terminal::clear_and_home;
 
@@ -2081,11 +2211,11 @@ int main()
 						break;
 					}
 					case 2:
-						if (state.year >= 1) {
+						if (state.year >= 1 && state.moves_left > 0) {
 							move_tanks(state, b, e1x, e1y, e2x, e2y);
 						}
 						else {
-							cout << "Tank divisions will be available at the end of this Production Year." << endl;
+							cout << "Tank divisions will be available at the end of this Production Year/ tank moves are limited to 3 per year." << endl;
 						}
 						break;
 
@@ -2097,8 +2227,8 @@ int main()
 						break;
 					}
 
-					case 5: 
-					
+					case 5:
+
 					{
 						state.pause = !state.pause;
 						break;
@@ -2159,7 +2289,7 @@ int main()
 				int test_choice = 0;
 
 				while (test_choice != 9 && !state.victory && !state.gameover) {
-					test_choice = show_test_menu(test_menu);   
+					test_choice = show_test_menu(test_menu);
 
 					switch (test_choice) {
 					case 1:
@@ -2209,17 +2339,27 @@ int main()
 					}
 					break;
 				}
-			//case 999: break;
+				//case 999: break;
 			}
 			}
-			cout << "Do you want to play again?" << endl;
-			cin >> state.reset_answer;
-			if (state.reset_answer == 'y') {
-				reset_game(state);
-				sys_choice = 999;
-			}
+			while (true) {
+				cout << "Do you want to play again?" << endl;
+				cin >> state.reset_answer;
 
+				if (!cin) {
+					cin.clear();
+					cin.ignore(10000, '\n');
+					cout << "Please enter y or n." << endl;
+					continue;
+				}
 
+				if (state.reset_answer == 'y' || state.reset_answer == 'n') {
+					break;
+					}
+				cout << "Please enter y or n." << endl;
+			}
+			reset_game(state);
+			sys_choice = 999;
 		}
 		cout << "\033[?25h";  // show cursor again
 	}

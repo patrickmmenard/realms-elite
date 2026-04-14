@@ -5,7 +5,7 @@
 #include <random>
 using namespace std;
 
-vector<string> govt_names = { "Republic", "Dictatorship", "Negan", "Cmd Blackadder" };
+vector<string> govt_names = { "Republic", "Dictatorship", "Negan", "Blackadder" };
 
 string random_govt_type(const vector<string>& govt_names) {
 	static mt19937 generator(random_device{}());
