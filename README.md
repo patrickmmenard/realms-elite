@@ -1,8 +1,18 @@
 # Patrick Realms Elite
-A C++ strategy game inspired by Barren Realms Elite and SimCity. (Beta)
 
-## Status
-Work in progress
+A C++ ASCII strategy game with turn-based gameplay inspired by Barren Realms Elite. (Beta)
 
-## How to run
-(Open in Visual Studio and build)
+## Download & Run
+
+Download the latest release:
+https://github.com/patrickmmenard/realms-elite/releases/tag/v0.1
+
+Then:
+- Run the `.exe`
+- Follow the on-screen instructions
+
+## Technologies
+
+- C++
+- Visual Studio
+- SFML (integration in progress)
