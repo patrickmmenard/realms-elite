@@ -16,4 +16,4 @@ Then:
 
 - C++
 - Visual Studio
-- SFML (integration in progress)
+- SFML migration in progress (next-generation version)
