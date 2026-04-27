@@ -11,6 +11,13 @@ https://github.com/patrickmmenard/realms-elite/releases/tag/v0.1
 Then:
 - Run the `.exe`
 - Follow the on-screen instructions
+- You are the center empire.  
+- Capture an enemy capital to win.
+
+## Display/ Troubleshooting
+
+Use Windows Terminal if display looks wrong.
+
 
 ## Technologies
 
